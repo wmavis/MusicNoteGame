@@ -1,0 +1,129 @@
+using UnityEngine;
+using System.Collections;
+
+/// <summary>
+/// Main game controller that manages game flow and logic
+/// </summary>
+public class GameManager : MonoBehaviour
+{
+    [Header("Game Settings")]
+    [SerializeField] private float delayBeforeNextNote = 2f;
+
+    [Header("References")]
+    [SerializeField] private StaffRenderer staffRenderer;
+    [SerializeField] private UIManager uiManager;
+
+    private MusicNote currentNote;
+    private int score = 0;
+    private bool waitingForAnswer = false;
+
+    void Start()
+    {
+        // Find references if not assigned
+        if (staffRenderer == null)
+            staffRenderer = FindObjectOfType<StaffRenderer>();
+        
+        if (uiManager == null)
+            uiManager = FindObjectOfType<UIManager>();
+
+        // Start the game
+        StartCoroutine(GameLoop());
+    }
+
+    IEnumerator GameLoop()
+    {
+        // Wait a moment before starting
+        yield return new WaitForSeconds(1f);
+
+        while (true)
+        {
+            // Generate and display a new note
+            GenerateNewNote();
+            
+            // Wait for player to answer
+            waitingForAnswer = true;
+            while (waitingForAnswer)
+            {
+                yield return null;
+            }
+
+            // Wait before showing next note
+            yield return new WaitForSeconds(delayBeforeNextNote);
+        }
+    }
+
+    void GenerateNewNote()
+    {
+        // Generate a random note
+        currentNote = MusicNote.GenerateRandomNote();
+        
+        // Display it on the staff
+        if (staffRenderer != null)
+        {
+            staffRenderer.DisplayNote(currentNote);
+        }
+
+        Debug.Log($"New note generated: {currentNote.Name}");
+    }
+
+    public void CheckAnswer(MusicNote.NoteName selectedNote)
+    {
+        if (!waitingForAnswer)
+            return;
+
+        // Disable buttons temporarily
+        if (uiManager != null)
+        {
+            uiManager.SetButtonsInteractable(false);
+        }
+
+        // Check if the answer is correct
+        if (selectedNote == currentNote.Name)
+        {
+            // Correct answer
+            score++;
+            if (uiManager != null)
+            {
+                uiManager.UpdateScore(score);
+                uiManager.ShowCorrectFeedback();
+            }
+            Debug.Log("Correct!");
+        }
+        else
+        {
+            // Incorrect answer
+            if (uiManager != null)
+            {
+                uiManager.ShowIncorrectFeedback(currentNote.Name.ToString());
+            }
+            Debug.Log($"Incorrect! The correct answer was {currentNote.Name}");
+        }
+
+        // Re-enable buttons after a short delay
+        StartCoroutine(ReEnableButtons());
+
+        // Move to next note
+        waitingForAnswer = false;
+    }
+
+    IEnumerator ReEnableButtons()
+    {
+        yield return new WaitForSeconds(0.5f);
+        if (uiManager != null)
+        {
+            uiManager.SetButtonsInteractable(true);
+        }
+    }
+
+    public void ResetGame()
+    {
+        score = 0;
+        if (uiManager != null)
+        {
+            uiManager.UpdateScore(score);
+        }
+        
+        StopAllCoroutines();
+        StartCoroutine(GameLoop());
+    }
+}
