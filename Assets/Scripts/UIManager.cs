@@ -89,21 +89,35 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    public void ShowCorrectFeedback()
+    public void ShowCorrectFeedback(string fullNoteName = "")
     {
         if (feedbackText != null)
         {
-            feedbackText.text = "Correct! ✓";
+            if (!string.IsNullOrEmpty(fullNoteName))
+            {
+                feedbackText.text = $"Correct! ✓ ({fullNoteName})";
+            }
+            else
+            {
+                feedbackText.text = "Correct! ✓";
+            }
             feedbackText.color = correctColor;
             feedbackTimer = feedbackDisplayTime;
         }
     }
 
-    public void ShowIncorrectFeedback(string correctAnswer)
+    public void ShowIncorrectFeedback(string correctAnswer, string fullNoteName = "")
     {
         if (feedbackText != null)
         {
-            feedbackText.text = $"Incorrect! The answer was {correctAnswer}";
+            if (!string.IsNullOrEmpty(fullNoteName))
+            {
+                feedbackText.text = $"Incorrect! The answer was {correctAnswer} ({fullNoteName})";
+            }
+            else
+            {
+                feedbackText.text = $"Incorrect! The answer was {correctAnswer}";
+            }
             feedbackText.color = incorrectColor;
             feedbackTimer = feedbackDisplayTime;
         }

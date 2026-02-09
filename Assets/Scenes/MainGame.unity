@@ -627,11 +627,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StaffRenderer
   staffWidth: 8
   lineSpacing: 0.5
+  staffGap: 2
   staffColor: {r: 0, g: 0, b: 0, a: 1}
   lineThickness: 0.05
-  notePrefab: {fileID: 0}
   noteColor: {r: 0, g: 0, b: 0, a: 1}
   noteSize: 0.6
+  trebleClefSprite: {fileID: 3286163911610860551, guid: 087ab0f705e17b44c98abfeecd637403, type: 3}
+  bassClefSprite: {fileID: 3286163911610860551, guid: 22ed5b84d39411e498907f2f4358da40, type: 3}
+  clefScale: 1.5
 --- !u!4 &595333501
 Transform:
   m_ObjectHideFlags: 0

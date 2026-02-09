@@ -85,18 +85,18 @@ public class GameManager : MonoBehaviour
             if (uiManager != null)
             {
                 uiManager.UpdateScore(score);
-                uiManager.ShowCorrectFeedback();
+                uiManager.ShowCorrectFeedback(currentNote.GetFullName());
             }
-            Debug.Log("Correct!");
+            Debug.Log($"Correct! That was {currentNote.GetFullName()}");
         }
         else
         {
             // Incorrect answer
             if (uiManager != null)
             {
-                uiManager.ShowIncorrectFeedback(currentNote.Name.ToString());
+                uiManager.ShowIncorrectFeedback(currentNote.Name.ToString(), currentNote.GetFullName());
             }
-            Debug.Log($"Incorrect! The correct answer was {currentNote.Name}");
+            Debug.Log($"Incorrect! The correct answer was {currentNote.Name} ({currentNote.GetFullName()})");
         }
 
         // Re-enable buttons after a short delay
