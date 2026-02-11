@@ -7,7 +7,7 @@ using System.Collections.Generic;
 public class StaffRenderer : MonoBehaviour
 {
     [Header("Staff Settings")]
-    [SerializeField] private float staffWidth = 8f;
+    [SerializeField] private float staffWidth = 12f;
     [SerializeField] private float lineSpacing = 0.5f;
     [SerializeField] private float staffGap = 2f; // Gap between treble and bass staves
     [SerializeField] private Color staffColor = Color.black;
@@ -20,7 +20,7 @@ public class StaffRenderer : MonoBehaviour
     [Header("Clef Symbols")]
     [SerializeField] private Sprite trebleClefSprite;
     [SerializeField] private Sprite bassClefSprite;
-    [SerializeField] private float clefScale = 1.5f;
+    [SerializeField] private float clefScale = 0.25f;
 
     private GameObject currentNoteObject;
     private LineRenderer[] trebleStaffLines;
@@ -44,6 +44,8 @@ public class StaffRenderer : MonoBehaviour
         // Treble staff is above, bass staff is below
         trebleStaffCenter = staffGap / 2 + lineSpacing * 2; // Middle line of treble staff
         bassStaffCenter = -staffGap / 2 - lineSpacing * 2;  // Middle line of bass staff
+        Debug.Log("Treble Staff Center Y: " + trebleStaffCenter);
+        Debug.Log("Bass Staff Center Y: " + bassStaffCenter);
 
         // Create treble staff (5 lines)
         trebleStaffLines = new LineRenderer[5];
@@ -59,6 +61,7 @@ public class StaffRenderer : MonoBehaviour
             line.startWidth = lineThickness;
             line.endWidth = lineThickness;
             line.positionCount = 2;
+            line.useWorldSpace = false;
             
             float yPos = trebleStaffCenter + (i - 2) * lineSpacing; // -2 to center on middle line
             line.SetPosition(0, new Vector3(-staffWidth / 2, yPos, 0));
@@ -73,7 +76,8 @@ public class StaffRenderer : MonoBehaviour
         {
             GameObject lineObj = new GameObject($"BassStaffLine_{i}");
             lineObj.transform.SetParent(transform);
-            
+            //lineObj.transform.position = new Vector3(0, 0, 0);
+
             LineRenderer line = lineObj.AddComponent<LineRenderer>();
             line.material = new Material(Shader.Find("Sprites/Default"));
             line.startColor = staffColor;
@@ -81,7 +85,8 @@ public class StaffRenderer : MonoBehaviour
             line.startWidth = lineThickness;
             line.endWidth = lineThickness;
             line.positionCount = 2;
-            
+            line.useWorldSpace = false;
+
             float yPos = bassStaffCenter + (i - 2) * lineSpacing; // -2 to center on middle line
             line.SetPosition(0, new Vector3(-staffWidth / 2, yPos, 0));
             line.SetPosition(1, new Vector3(staffWidth / 2, yPos, 0));
@@ -93,7 +98,7 @@ public class StaffRenderer : MonoBehaviour
         CreateClefSymbols();
 
         // Center the staff
-        transform.position = new Vector3(0, 0, 0);
+        transform.position = new Vector3(0, 2, 0);
     }
 
     void CreateClefSymbols()
@@ -104,7 +109,7 @@ public class StaffRenderer : MonoBehaviour
         SpriteRenderer trebleRenderer = trebleClefObject.AddComponent<SpriteRenderer>();
         trebleRenderer.sprite = trebleClefSprite;
         trebleRenderer.color = staffColor;
-        trebleClefObject.transform.localPosition = new Vector3(-staffWidth / 2 - 1f, trebleStaffCenter, -0.1f);
+        trebleClefObject.transform.localPosition = new Vector3(-staffWidth / 2 + 3*clefScale, trebleStaffCenter, -0.1f);
         trebleClefObject.transform.localScale = new Vector3(clefScale, clefScale, 1f);
 
         // Bass clef symbol
@@ -113,7 +118,7 @@ public class StaffRenderer : MonoBehaviour
         SpriteRenderer bassRenderer = bassClefObject.AddComponent<SpriteRenderer>();
         bassRenderer.sprite = bassClefSprite;
         bassRenderer.color = staffColor;
-        bassClefObject.transform.localPosition = new Vector3(-staffWidth / 2 - 1f, bassStaffCenter, -0.1f);
+        bassClefObject.transform.localPosition = new Vector3(-staffWidth / 2 + 3*clefScale, bassStaffCenter, -0.1f);
         bassClefObject.transform.localScale = new Vector3(clefScale, clefScale, 1f);
     }
 
@@ -148,6 +153,7 @@ public class StaffRenderer : MonoBehaviour
         // Middle C is between the two staves
         
         float middleCPosition = (trebleStaffCenter - lineSpacing * 2 + bassStaffCenter + lineSpacing * 2) / 2;
+        Debug.Log($"Middle C Y Position: {middleCPosition}");
         return middleCPosition + staffPosition * (lineSpacing / 2);
     }
 
@@ -158,6 +164,7 @@ public class StaffRenderer : MonoBehaviour
         float trebleTop = trebleStaffCenter + lineSpacing * 2;    // F5
         float bassBottom = bassStaffCenter - lineSpacing * 2;     // G2
         float bassTop = bassStaffCenter + lineSpacing * 2;        // A3
+        Debug.Log(trebleTop + " " + trebleBottom + " " + bassTop + " " + bassBottom);
 
         // Ledger lines below treble staff (between staves and for Middle C)
         if (noteYPos < trebleBottom && noteYPos > bassTop)
@@ -234,7 +241,8 @@ public class StaffRenderer : MonoBehaviour
         float ledgerWidth = noteSize * 1.5f;
         line.SetPosition(0, new Vector3(-ledgerWidth / 2, yPos, 0));
         line.SetPosition(1, new Vector3(ledgerWidth / 2, yPos, 0));
-        
+        line.useWorldSpace = false;
+
         ledgerLines.Add(lineObj);
     }
 

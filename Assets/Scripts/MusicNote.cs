@@ -24,23 +24,23 @@ public class MusicNote
     // All 52 natural piano keys (A0 to C8)
     private static readonly (NoteName name, int octave)[] allPianoKeys = new (NoteName, int)[]
     {
-        // Octave 0
+        // Octave 0 (0-1)
         (NoteName.A, 0), (NoteName.B, 0),
-        // Octave 1
+        // Octave 1 (2-8)
         (NoteName.C, 1), (NoteName.D, 1), (NoteName.E, 1), (NoteName.F, 1), (NoteName.G, 1), (NoteName.A, 1), (NoteName.B, 1),
-        // Octave 2
+        // Octave 2 (9-15)
         (NoteName.C, 2), (NoteName.D, 2), (NoteName.E, 2), (NoteName.F, 2), (NoteName.G, 2), (NoteName.A, 2), (NoteName.B, 2),
-        // Octave 3
+        // Octave 3 (16-22)
         (NoteName.C, 3), (NoteName.D, 3), (NoteName.E, 3), (NoteName.F, 3), (NoteName.G, 3), (NoteName.A, 3), (NoteName.B, 3),
-        // Octave 4 (Middle C is C4)
+        // Octave 4 (Middle C is C4) (23-29)
         (NoteName.C, 4), (NoteName.D, 4), (NoteName.E, 4), (NoteName.F, 4), (NoteName.G, 4), (NoteName.A, 4), (NoteName.B, 4),
-        // Octave 5
+        // Octave 5 (30-36)
         (NoteName.C, 5), (NoteName.D, 5), (NoteName.E, 5), (NoteName.F, 5), (NoteName.G, 5), (NoteName.A, 5), (NoteName.B, 5),
-        // Octave 6
+        // Octave 6 (37-43)
         (NoteName.C, 6), (NoteName.D, 6), (NoteName.E, 6), (NoteName.F, 6), (NoteName.G, 6), (NoteName.A, 6), (NoteName.B, 6),
-        // Octave 7
+        // Octave 7 (44-50)
         (NoteName.C, 7), (NoteName.D, 7), (NoteName.E, 7), (NoteName.F, 7), (NoteName.G, 7), (NoteName.A, 7), (NoteName.B, 7),
-        // Octave 8
+        // Octave 8 (51)
         (NoteName.C, 8)
     };
 

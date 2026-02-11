@@ -625,7 +625,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39ae36bf785b8a349a35876b775ad316, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StaffRenderer
-  staffWidth: 8
+  staffWidth: 12
   lineSpacing: 0.5
   staffGap: 2
   staffColor: {r: 0, g: 0, b: 0, a: 1}
@@ -634,7 +634,7 @@ MonoBehaviour:
   noteSize: 0.6
   trebleClefSprite: {fileID: 3286163911610860551, guid: 087ab0f705e17b44c98abfeecd637403, type: 3}
   bassClefSprite: {fileID: 3286163911610860551, guid: 22ed5b84d39411e498907f2f4358da40, type: 3}
-  clefScale: 1.5
+  clefScale: 0.25
 --- !u!4 &595333501
 Transform:
   m_ObjectHideFlags: 0
@@ -644,7 +644,7 @@ Transform:
   m_GameObject: {fileID: 595333499}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1824,8 +1824,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 48
+  m_fontSizeBase: 48
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1890,7 +1890,7 @@ GameObject:
   - component: {fileID: 1451152569}
   - component: {fileID: 1451152568}
   m_Layer: 5
-  m_Name: ScoreText
+  m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2548,8 +2548,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32
-  m_fontSizeBase: 32
+  m_fontSize: 48
+  m_fontSizeBase: 48
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

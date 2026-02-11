@@ -63,7 +63,7 @@ public class GameManager : MonoBehaviour
             staffRenderer.DisplayNote(currentNote);
         }
 
-        Debug.Log($"New note generated: {currentNote.Name}");
+        Debug.Log($"New note generated: {currentNote.Name} (pos: " + currentNote.StaffPosition + ")");
     }
 
     public void CheckAnswer(MusicNote.NoteName selectedNote)
