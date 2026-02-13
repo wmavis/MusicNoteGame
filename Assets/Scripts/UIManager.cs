@@ -11,6 +11,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI feedbackText;
     [SerializeField] private Button[] noteButtons; // Buttons for C, D, E, F, G, A, B
+    [SerializeField] private Toggle showNoteNamesToggle; // Toggle for showing note names
 
     [Header("Feedback Settings")]
     [SerializeField] private Color correctColor = Color.green;
@@ -18,15 +19,20 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float feedbackDisplayTime = 1.5f;
 
     private GameManager gameManager;
+    private StaffRenderer staffRenderer;
     private float feedbackTimer = 0f;
 
     void Start()
     {
         gameManager = FindObjectOfType<GameManager>();
-        
+        staffRenderer = FindObjectOfType<StaffRenderer>();
+
         // Setup note buttons
         SetupNoteButtons();
-        
+
+        // Setup show note names toggle
+        SetupShowNoteNamesToggle();
+
         // Initialize UI
         UpdateScore(0);
         ClearFeedback();
@@ -63,13 +69,30 @@ public class UIManager : MonoBehaviour
         {
             MusicNote.NoteName noteName = noteNames[i];
             noteButtons[i].onClick.AddListener(() => OnNoteButtonClicked(noteName));
-            
+
             // Set button text
             TextMeshProUGUI buttonText = noteButtons[i].GetComponentInChildren<TextMeshProUGUI>();
             if (buttonText != null)
             {
                 buttonText.text = noteName.ToString();
             }
+        }
+    }
+
+    private void SetupShowNoteNamesToggle()
+    {
+        showNoteNamesToggle.isOn = staffRenderer.GetShowNoteNames();
+        if (showNoteNamesToggle != null)
+        {
+            showNoteNamesToggle.onValueChanged.AddListener(OnShowNoteNamesToggled);
+        }
+    }
+
+    private void OnShowNoteNamesToggled(bool isOn)
+    {
+        if (staffRenderer != null)
+        {
+            staffRenderer.SetShowNoteNames(isOn);
         }
     }
 
