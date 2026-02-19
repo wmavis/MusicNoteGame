@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
@@ -52,6 +53,19 @@ public class UIManager : MonoBehaviour
             {
                 ClearFeedback();
             }
+        }
+
+        // Handle keyboard input for note answers
+        var keyboard = Keyboard.current;
+        if (keyboard != null)
+        {
+            if (keyboard.cKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.C);
+            else if (keyboard.dKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.D);
+            else if (keyboard.eKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.E);
+            else if (keyboard.fKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.F);
+            else if (keyboard.gKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.G);
+            else if (keyboard.aKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.A);
+            else if (keyboard.bKey.wasPressedThisFrame) OnNoteButtonClicked(MusicNote.NoteName.B);
         }
     }
 

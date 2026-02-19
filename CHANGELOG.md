@@ -27,9 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Change the note sphere to be a whole note sprite
 
-## [1.2.0] - ?
+## [1.2.0] - 2026-02-19
 
-### Add the ability to answer with keyboard input instead of just clicking buttons
+### Added
+- **Keyboard Input** - Players can now press C, D, E, F, G, A, or B on the keyboard to answer instead of clicking buttons
 
 ## [1.1.0] - 2026-02-03
 
