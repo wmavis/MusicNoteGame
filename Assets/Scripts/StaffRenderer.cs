@@ -14,8 +14,10 @@ public class StaffRenderer : MonoBehaviour
     [SerializeField] private float lineThickness = 0.05f;
 
     [Header("Note Settings")]
+    [SerializeField] private Sprite wholeNoteSprite;
     [SerializeField] private Color noteColor = Color.black;
     [SerializeField] private float noteSize = 0.6f;
+    [SerializeField] private int noteSortingOrder = 1;
     [SerializeField] private bool showNoteNames = false;
     [SerializeField] private float noteLabelFontSize = 4f;
 
@@ -161,17 +163,17 @@ public class StaffRenderer : MonoBehaviour
         currentNoteYPos = CalculateNoteYPosition(note.StaffPosition, bassClef);
 
         // Create new note
-        GameObject noteObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        noteObject.name = $"Note_{note.GetFullName()}";
+        GameObject noteObject = new GameObject($"Note_{note.GetFullName()}");
         noteObject.transform.SetParent(transform);
-        noteObject.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, -0.1f);
-        noteObject.transform.localScale = new Vector3(noteSize, noteSize, noteSize);
+        noteObject.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, 0f);
+        noteObject.transform.localScale = new Vector3(noteSize, noteSize, 1f);
         noteObjects.Add(noteObject);
 
-        // Set note color
-        Renderer renderer = noteObject.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Sprites/Default"));
-        renderer.material.color = noteColor;
+        // Render as whole note sprite
+        SpriteRenderer sr = noteObject.AddComponent<SpriteRenderer>();
+        sr.sprite = wholeNoteSprite;
+        sr.color = noteColor;
+        sr.sortingOrder = noteSortingOrder;
 
         // Add ledger lines if needed
         AddLedgerLinesIfNeeded(note.StaffPosition, noteXPos, currentNoteYPos);

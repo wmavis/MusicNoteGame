@@ -23,9 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Animate notes along staff
 
-## [1.3.0] - ?
+## [1.3.0] - 2026-02-19
 
-### Change the note sphere to be a whole note sprite
+### Changed
+- **Note Rendering** - Replaced sphere primitive with a whole note sprite using `SpriteRenderer`
+
+### Added
+- **Whole Note Sprite field** - `StaffRenderer` now exposes a `Whole Note Sprite` field in the Inspector (Note Settings) to assign the sprite asset
+- **Note Sorting Order field** - Exposed `noteSortingOrder` in the Inspector to control render order relative to staff lines
 
 ## [1.2.0] - 2026-02-19
 
