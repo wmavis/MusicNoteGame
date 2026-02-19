@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!--
+    Whole note sprite.
+    Outer ellipse: cx=100 cy=50 rx=90 ry=42
+    Inner cutout:  cx=100 cy=50 rx=55 ry=20, rotated -15 degrees
+      Right point: (153.12, 35.77)
+      Left  point: ( 46.88, 64.23)
+    fill-rule="evenodd" makes the inner sub-path a transparent hole.
+    White fill so SpriteRenderer.color tinting works correctly.
+  -->
+  <path fill="white" fill-rule="evenodd"
+    d="M 190,50
+       A 90,42 0 1 1 10,50
+       A 90,42 0 1 1 190,50 Z
+       M 153.12,35.77
+       A 55,20 -15 1 1 46.88,64.23
+       A 55,20 -15 1 1 153.12,35.77 Z"/>
+</svg>
