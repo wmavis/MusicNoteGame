@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -10,18 +11,15 @@ public class MusicNote
         C, D, E, F, G, A, B
     }
 
-    public enum Clef
-    {
-        Treble,
-        Bass
-    }
-
     public NoteName Name { get; private set; }
     public int Octave { get; private set; } // 0-8 for piano range
-    public Clef ClefType { get; private set; }
     public int StaffPosition { get; private set; } // Position relative to Middle C
+    public bool BassClef { get; private set; } // Is the note in the bass or treble clef?
 
     // All 52 natural piano keys (A0 to C8)
+    // Subset: 29 notes: 4 below bass clef - C2 (index 9), 2 above bass middle C4 - E4 (25),
+    //                   2 below treble middle C4 - A3 (21), 4 above treble clef - C6 (37)
+    //                   Middle C (23)
     private static readonly (NoteName name, int octave)[] allPianoKeys = new (NoteName, int)[]
     {
         // Octave 0 (0-1)
@@ -49,7 +47,18 @@ public class MusicNote
         Name = name;
         Octave = octave;
         StaffPosition = CalculateStaffPosition(name, octave);
-        ClefType = DetermineClef(StaffPosition);
+        if (StaffPosition > 2) // Treble only
+        {
+            BassClef = false;
+        }
+        else if(StaffPosition < -2) // Bass only
+        {
+            BassClef = true;
+        }
+        else // Either treble or bass (pick at random)
+        {
+            BassClef = Random.Range(0, 1) == 0;
+        }
     }
 
     private int CalculateStaffPosition(NoteName name, int octave)
@@ -75,18 +84,30 @@ public class MusicNote
         return (octave - 4) * 7 + noteValue;
     }
 
-    private Clef DetermineClef(int position)
-    {
-        // Middle C and above typically use treble clef
-        // Below Middle C typically uses bass clef
-        return position >= 0 ? Clef.Treble : Clef.Bass;
-    }
-
     public static MusicNote GenerateRandomNote()
     {
-        int randomIndex = Random.Range(0, allPianoKeys.Length);
+        return GenerateRandomNote(0, allPianoKeys.Length);
+    }
+
+    public static MusicNote GenerateRandomNote(int firstIndex, int lastIndex)
+    {
+        int randomIndex = Random.Range(firstIndex, lastIndex);
         var (name, octave) = allPianoKeys[randomIndex];
         return new MusicNote(name, octave);
+    }
+
+    public static List<MusicNote> GetAllNotes()
+    {
+        List<MusicNote> allNotes = new List<MusicNote>();
+
+        for (int i = GameManager.firstNoteIndex; i <= GameManager.lastNoteIndex; i++)
+        {
+            var (name, octave) = allPianoKeys[i];
+            allNotes.Add(new MusicNote(name, octave));
+
+        }
+
+        return allNotes;
     }
 
     public string GetFullName()

@@ -7,9 +7,9 @@ using System.Collections.Generic;
 public class StaffRenderer : MonoBehaviour
 {
     [Header("Staff Settings")]
-    [SerializeField] private float staffWidth = 12f;
-    [SerializeField] private float lineSpacing = 0.5f;
-    [SerializeField] private float staffGap = 2f; // Gap between treble and bass staves
+    [SerializeField] private float staffWidth = 20f;
+    [SerializeField] private float lineSpacing = 0.5f; // Distance between staff lines
+    [SerializeField] private float staffGap = 3.5f; // Gap between treble and bass staves
     [SerializeField] private Color staffColor = Color.black;
     [SerializeField] private float lineThickness = 0.05f;
 
@@ -25,19 +25,25 @@ public class StaffRenderer : MonoBehaviour
     [SerializeField] private float clefScale = 0.25f;
     [SerializeField] private int clefSortingOrder = 0;
 
-    private GameObject currentNoteObject;
-    private GameObject currentNoteLabelObject;
+    [Header("Debug Settings")]
+    [SerializeField] private float debugNoteSpacing = 0.7f; // Horizontal spacing between debug notes
+
+    private List<GameObject> noteObjects = new List<GameObject>();
+    private List<GameObject> noteLabelObjects = new List<GameObject>();
+    private List<GameObject> noteLedgerLineObjects = new List<GameObject>();
     private MusicNote currentNote; // Store current note for toggle updates
     private float currentNoteYPos; // Store Y position for label creation
     private LineRenderer[] trebleStaffLines;
     private LineRenderer[] bassStaffLines;
-    private List<GameObject> ledgerLines = new List<GameObject>();
     private GameObject trebleClefObject;
     private GameObject bassClefObject;
 
-    // Reference positions
-    private float trebleStaffCenter; // Center of treble staff (B4)
-    private float bassStaffCenter;   // Center of bass staff (D3)
+    // Debug mode
+    private bool debugMode = false;
+
+    // Reference positions (Y coordinates in world space)
+    private float trebleStaffCenter; // Y position of treble staff middle line (B4, position +6)
+    private float bassStaffCenter;   // Y position of bass staff middle line (D3, position -6)
 
     void Start()
     {
@@ -46,12 +52,23 @@ public class StaffRenderer : MonoBehaviour
 
     void CreateGrandStaff()
     {
-        // Calculate staff positions
-        // Treble staff is above, bass staff is below
-        trebleStaffCenter = staffGap / 2 + lineSpacing * 2; // Middle line of treble staff
-        bassStaffCenter = -staffGap / 2 - lineSpacing * 2;  // Middle line of bass staff
-        Debug.Log("Treble Staff Center Y: " + trebleStaffCenter);
-        Debug.Log("Bass Staff Center Y: " + bassStaffCenter);
+        // Calculate staff positions to maintain correct musical relationships
+        //
+        // In standard notation:
+        // - Treble staff middle line = B4
+        // - Bass staff middle line = D3
+        // - B4 is 6 positions above Middle C (C4)
+        // - D3 is 6 positions below Middle C
+        // - Each position = lineSpacing / 2
+
+        float middleCPosition = 0f; // Use screen center as reference
+        trebleStaffCenter = middleCPosition + 3 * lineSpacing + staffGap / 2; // B4 at 3 * lineSpacing above C4
+        bassStaffCenter = middleCPosition - 3 * lineSpacing - staffGap / 2;    // D3 at 3 * lineSpacing below C4
+
+        Debug.Log("Middle C Position: " + middleCPosition);
+        Debug.Log("Treble Staff Center Y (B4): " + trebleStaffCenter);
+        Debug.Log("Bass Staff Center Y (D3): " + bassStaffCenter);
+        Debug.Log("Gap between staff lines: " + ((trebleStaffCenter - 2*lineSpacing) - (bassStaffCenter + 2*lineSpacing)));
 
         // Create treble staff (5 lines)
         trebleStaffLines = new LineRenderer[5];
@@ -132,67 +149,69 @@ public class StaffRenderer : MonoBehaviour
         Debug.Log($"Bass Clef - World Pos: {bassClefObject.transform.position}, Local Pos: {bassClefObject.transform.localPosition}, Sorting Order: {bassRenderer.sortingOrder}, Sprite Assigned: {bassRenderer.sprite != null}");
     }
 
-    public void DisplayNote(MusicNote note)
+    public void DisplayNote(MusicNote note, bool bassClef)
     {
-        // Remove previous note and ledger lines
-        ClearNote();
+        DisplayNote(note, 0, bassClef);
+    }
 
+    public void DisplayNote(MusicNote note, float noteXPos, bool bassClef)
+    {
         // Store current note and position for toggle updates
         currentNote = note;
-        currentNoteYPos = CalculateNoteYPosition(note.StaffPosition);
+        currentNoteYPos = CalculateNoteYPosition(note.StaffPosition, bassClef);
 
         // Create new note
-        currentNoteObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        currentNoteObject.name = "CurrentNote";
-        currentNoteObject.transform.SetParent(transform);
-        currentNoteObject.transform.localPosition = new Vector3(0, currentNoteYPos, -0.1f);
-        currentNoteObject.transform.localScale = new Vector3(noteSize, noteSize, noteSize);
+        GameObject noteObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        noteObject.name = $"Note_{note.GetFullName()}";
+        noteObject.transform.SetParent(transform);
+        noteObject.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, -0.1f);
+        noteObject.transform.localScale = new Vector3(noteSize, noteSize, noteSize);
+        noteObjects.Add(noteObject);
 
         // Set note color
-        Renderer renderer = currentNoteObject.GetComponent<Renderer>();
+        Renderer renderer = noteObject.GetComponent<Renderer>();
         renderer.material.color = noteColor;
 
         // Add ledger lines if needed
-        AddLedgerLinesIfNeeded(note.StaffPosition, currentNoteYPos);
+        AddLedgerLinesIfNeeded(note.StaffPosition, noteXPos, currentNoteYPos);
 
         // Create note label if enabled
         if (showNoteNames)
         {
-            CreateNoteLabel(note, currentNoteYPos);
+            CreateNoteLabel(note, noteXPos, currentNoteYPos);
         }
     }
 
-    private float CalculateNoteYPosition(int staffPosition)
+    private float CalculateNoteYPosition(int staffPosition, bool bassClef)
     {
         // staffPosition is relative to Middle C (C4) = 0
-        // Each position is a half-step on the staff (lineSpacing / 2)
-        // Middle C is between the two staves
+        // Each position moves up one line or space (lineSpacing / 2)
+        // Middle C is at Y positions staffGap/2 (right hand) and -staffGap/2 (left hand)
 
-        float middleCPosition = (trebleStaffCenter - lineSpacing * 2 + bassStaffCenter + lineSpacing * 2) / 2;
-        Debug.Log($"Middle C Y Position: {middleCPosition}");
+        float middleCPosition = bassClef ? -staffGap / 2 : staffGap / 2;
         return middleCPosition + staffPosition * (lineSpacing / 2);
     }
 
-    private void AddLedgerLinesIfNeeded(int staffPosition, float noteYPos)
+    private void AddLedgerLinesIfNeeded(int staffPosition, float noteXPos, float noteYPos)
     {
         // Determine if ledger lines are needed
-        float trebleBottom = trebleStaffCenter - lineSpacing * 2; // E4
-        float trebleTop = trebleStaffCenter + lineSpacing * 2;    // F5
-        float bassBottom = bassStaffCenter - lineSpacing * 2;     // G2
-        float bassTop = bassStaffCenter + lineSpacing * 2;        // A3
-        Debug.Log(trebleTop + " " + trebleBottom + " " + bassTop + " " + bassBottom);
+        // Treble staff: E4 (bottom line) to F5 (top line)
+        // Bass staff: G2 (bottom line) to A3 (top line)
+        float trebleBottom = trebleStaffCenter - lineSpacing * 2; // E4 (position 2)
+        float trebleTop = trebleStaffCenter + lineSpacing * 2;    // F5 (position 10)
+        float bassBottom = bassStaffCenter - lineSpacing * 2;     // G2 (position -10)
+        float bassTop = bassStaffCenter + lineSpacing * 2;        // A3 (position -2)
+        float center = (trebleStaffCenter + bassStaffCenter) / 2; // 0
+        Debug.Log($"Treble: {trebleTop} to {trebleBottom}, Bass: {bassTop} to {bassBottom}");
 
         // Ledger lines below treble staff (between staves and for Middle C)
-        if (noteYPos < trebleBottom && noteYPos > bassTop)
+        if (noteYPos < trebleBottom && noteYPos > center)
         {
             // Middle C and notes between staves
             float currentY = trebleBottom - lineSpacing;
             while (currentY >= noteYPos - 0.01f)
             {
-                if (Mathf.Abs(currentY - noteYPos) < lineSpacing / 4)
-                {
-                    CreateLedgerLine(currentY);
-                }
+                CreateLedgerLine(noteXPos, currentY);
                 currentY -= lineSpacing;
             }
         }
@@ -203,10 +222,7 @@ public class StaffRenderer : MonoBehaviour
             float currentY = trebleTop + lineSpacing;
             while (currentY <= noteYPos + 0.01f)
             {
-                if (Mathf.Abs(currentY - noteYPos) < lineSpacing / 4)
-                {
-                    CreateLedgerLine(currentY);
-                }
+                CreateLedgerLine(noteXPos, currentY);
                 currentY += lineSpacing;
             }
         }
@@ -217,33 +233,28 @@ public class StaffRenderer : MonoBehaviour
             float currentY = bassBottom - lineSpacing;
             while (currentY >= noteYPos - 0.01f)
             {
-                if (Mathf.Abs(currentY - noteYPos) < lineSpacing / 4)
-                {
-                    CreateLedgerLine(currentY);
-                }
+                CreateLedgerLine(noteXPos, currentY);
                 currentY -= lineSpacing;
             }
         }
 
         // Ledger lines above bass staff (between staves)
-        if (noteYPos > bassTop && noteYPos < trebleBottom)
+        if (noteYPos > bassTop && noteYPos < center)
         {
             float currentY = bassTop + lineSpacing;
             while (currentY <= noteYPos + 0.01f)
             {
-                if (Mathf.Abs(currentY - noteYPos) < lineSpacing / 4)
-                {
-                    CreateLedgerLine(currentY);
-                }
+                CreateLedgerLine(noteXPos, currentY);
                 currentY += lineSpacing;
             }
         }
     }
 
-    private void CreateLedgerLine(float yPos)
+    private void CreateLedgerLine(float xPos, float yPos)
     {
         GameObject lineObj = new GameObject("LedgerLine");
         lineObj.transform.SetParent(transform);
+        lineObj.transform.localPosition = new Vector3(0, 0, 0);
 
         LineRenderer line = lineObj.AddComponent<LineRenderer>();
         line.material = new Material(Shader.Find("Sprites/Default"));
@@ -252,32 +263,33 @@ public class StaffRenderer : MonoBehaviour
         line.startWidth = lineThickness;
         line.endWidth = lineThickness;
         line.positionCount = 2;
+        line.useWorldSpace = false;
 
         // Ledger lines are shorter than staff lines
         float ledgerWidth = noteSize * 1.5f;
-        line.SetPosition(0, new Vector3(-ledgerWidth / 2, yPos, 0));
-        line.SetPosition(1, new Vector3(ledgerWidth / 2, yPos, 0));
-        line.useWorldSpace = false;
+        line.SetPosition(0, new Vector3(xPos - ledgerWidth / 2, yPos, 0));
+        line.SetPosition(1, new Vector3(xPos + ledgerWidth / 2, yPos, 0));
 
-        ledgerLines.Add(lineObj);
+        noteLedgerLineObjects.Add(lineObj);
     }
 
-    private void CreateNoteLabel(MusicNote note, float noteYPos)
+    private void CreateNoteLabel(MusicNote note, float noteXPos, float noteYPos)
     {
         // Create a new GameObject for the label
-        currentNoteLabelObject = new GameObject("NoteLabel");
-        currentNoteLabelObject.transform.SetParent(transform);
-        currentNoteLabelObject.transform.localPosition = new Vector3(0, noteYPos, -0.5f);
+        GameObject noteLabelObject = new GameObject("NoteLabel");
+        noteLabelObject.transform.SetParent(transform);
+        noteLabelObject.transform.localPosition = new Vector3(noteXPos, noteYPos, -0.5f);
+        noteLabelObjects.Add(noteLabelObject);
 
         // Add TextMeshPro component
-        TMPro.TextMeshPro textMesh = currentNoteLabelObject.AddComponent<TMPro.TextMeshPro>();
+        TMPro.TextMeshPro textMesh = noteLabelObject.AddComponent<TMPro.TextMeshPro>();
         textMesh.text = note.GetFullName();
         textMesh.fontSize = noteLabelFontSize;
         textMesh.color = Color.black; // Black text for contrast on white note
         textMesh.alignment = TMPro.TextAlignmentOptions.Center;
 
         // Center the text horizontally and vertically
-        RectTransform rectTransform = currentNoteLabelObject.GetComponent<RectTransform>();
+        RectTransform rectTransform = noteLabelObject.GetComponent<RectTransform>();
         if (rectTransform != null)
         {
             rectTransform.sizeDelta = new Vector2(2f, 1f);
@@ -287,32 +299,37 @@ public class StaffRenderer : MonoBehaviour
         textMesh.sortingOrder = 10;
     }
 
-    public void ClearNote()
+    public void ClearNotes()
     {
-        if (currentNoteObject != null)
+        // Clear all note objects
+        foreach (GameObject noteObj in noteObjects)
         {
-            Destroy(currentNoteObject);
-            currentNoteObject = null;
+            if (noteObj != null)
+            {
+                Destroy(noteObj);
+            }
         }
+        noteObjects.Clear();
 
-        if (currentNoteLabelObject != null)
+        // Clear all note labels
+        foreach (GameObject labelObj in noteLabelObjects)
         {
-            Destroy(currentNoteLabelObject);
-            currentNoteLabelObject = null;
+            if (labelObj != null)
+            {
+                Destroy(labelObj);
+            }
         }
+        noteLabelObjects.Clear();
 
-        // Clear stored note data
-        currentNote = null;
-
-        // Clear all ledger lines
-        foreach (GameObject ledgerLine in ledgerLines)
+        // Clear all notes ledger lines
+        foreach (GameObject ledgerLine in noteLedgerLineObjects)
         {
             if (ledgerLine != null)
             {
                 Destroy(ledgerLine);
             }
         }
-        ledgerLines.Clear();
+        noteLedgerLineObjects.Clear();
     }
 
     public void SetShowNoteNames(bool show)
@@ -320,24 +337,83 @@ public class StaffRenderer : MonoBehaviour
         showNoteNames = show;
 
         // Update the currently displayed note's label
-        if (currentNote != null && currentNoteObject != null)
+        if (currentNote != null && noteObjects.Count > 0)
         {
-            if (show && currentNoteLabelObject == null)
+            if (show && noteLabelObjects.Count == 0)
             {
                 // Show label for current note
-                CreateNoteLabel(currentNote, currentNoteYPos);
+                CreateNoteLabel(currentNote, 0, currentNoteYPos);
             }
-            else if (!show && currentNoteLabelObject != null)
+            else if (!show && noteLabelObjects.Count > 0)
             {
-                // Hide label for current note
-                Destroy(currentNoteLabelObject);
-                currentNoteLabelObject = null;
+                foreach(GameObject noteLabelObject in noteLabelObjects)
+                {
+                    Destroy(noteLabelObject);
+
+                }
+                noteLabelObjects.Clear();
             }
+        }
+
+        // Update debug mode labels if in debug mode
+        if (debugMode)
+        {
+            // Refresh debug display to show/hide labels
+            DisplayAllDebugNotes();
         }
     }
 
     public bool GetShowNoteNames()
     {
         return showNoteNames;
+    }
+
+    public void SetDebugMode(bool enabled)
+    {
+        debugMode = enabled;
+
+        if (debugMode)
+        {
+            // Show all notes
+            DisplayAllDebugNotes();
+        }
+        else
+        {
+            // Clear all debug notes
+            ClearNotes();
+        }
+    }
+
+    public bool GetDebugMode()
+    {
+        return debugMode;
+    }
+
+    private void DisplayAllDebugNotes()
+    {
+        // Clear any existing notes first
+        ClearNotes();
+
+        // Get list of notes
+        List<MusicNote> allNotes = MusicNote.GetAllNotes();
+
+        // Calculate starting X position to center all notes
+        float totalWidth = (allNotes.Count - 1) * debugNoteSpacing;
+        float startX = -totalWidth / 2;
+
+        Debug.Log($"Displaying {allNotes.Count} debug notes with spacing {debugNoteSpacing}. Total width: {totalWidth}, Starting X: {startX}");
+
+        int middleCIndex = (allNotes.Count - 1) / 2;
+        // Display each bass clef note
+        for (int i = 0; i <= middleCIndex + 2; i++)
+        {
+            DisplayNote(allNotes[i], startX + i * debugNoteSpacing, true);
+        }
+
+        // Display each treble clef note
+        for (int i = middleCIndex - 2; i < allNotes.Count; i++)
+        {
+            DisplayNote(allNotes[i], startX + i * debugNoteSpacing, false);
+        }
     }
 }

@@ -12,6 +12,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI feedbackText;
     [SerializeField] private Button[] noteButtons; // Buttons for C, D, E, F, G, A, B
     [SerializeField] private Toggle showNoteNamesToggle; // Toggle for showing note names
+    [SerializeField] private Toggle debugModeToggle; // Toggle for debug mode (show all notes)
 
     [Header("Feedback Settings")]
     [SerializeField] private Color correctColor = Color.green;
@@ -24,14 +25,17 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
-        gameManager = FindObjectOfType<GameManager>();
-        staffRenderer = FindObjectOfType<StaffRenderer>();
+        gameManager = FindFirstObjectByType<GameManager>();
+        staffRenderer = FindFirstObjectByType<StaffRenderer>();
 
         // Setup note buttons
         SetupNoteButtons();
 
         // Setup show note names toggle
         SetupShowNoteNamesToggle();
+
+        // Setup debug mode toggle
+        SetupDebugModeToggle();
 
         // Initialize UI
         UpdateScore(0);
@@ -81,9 +85,9 @@ public class UIManager : MonoBehaviour
 
     private void SetupShowNoteNamesToggle()
     {
-        showNoteNamesToggle.isOn = staffRenderer.GetShowNoteNames();
-        if (showNoteNamesToggle != null)
+        if (showNoteNamesToggle != null && staffRenderer != null)
         {
+            showNoteNamesToggle.isOn = staffRenderer.GetShowNoteNames();
             showNoteNamesToggle.onValueChanged.AddListener(OnShowNoteNamesToggled);
         }
     }
@@ -93,6 +97,28 @@ public class UIManager : MonoBehaviour
         if (staffRenderer != null)
         {
             staffRenderer.SetShowNoteNames(isOn);
+        }
+    }
+
+    private void SetupDebugModeToggle()
+    {
+        if (debugModeToggle != null && staffRenderer != null)
+        {
+            debugModeToggle.isOn = staffRenderer.GetDebugMode();
+            debugModeToggle.onValueChanged.AddListener(OnDebugModeToggled);
+        }
+    }
+
+    private void OnDebugModeToggled(bool isOn)
+    {
+        if (staffRenderer != null)
+        {
+            staffRenderer.SetDebugMode(isOn);
+        }
+
+        if (gameManager != null)
+        {
+            gameManager.SetDebugMode(isOn);
         }
     }
 

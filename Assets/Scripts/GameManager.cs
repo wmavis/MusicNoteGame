@@ -16,15 +16,18 @@ public class GameManager : MonoBehaviour
     private MusicNote currentNote;
     private int score = 0;
     private bool waitingForAnswer = false;
+    private bool debugMode = false;
+    public static readonly int firstNoteIndex = 9; // C2
+    public static readonly int lastNoteIndex = 37; // C6
 
     void Start()
     {
         // Find references if not assigned
         if (staffRenderer == null)
-            staffRenderer = FindObjectOfType<StaffRenderer>();
+            staffRenderer = FindFirstObjectByType<StaffRenderer>();
         
         if (uiManager == null)
-            uiManager = FindObjectOfType<UIManager>();
+            uiManager = FindFirstObjectByType<UIManager>();
 
         // Start the game
         StartCoroutine(GameLoop());
@@ -37,13 +40,26 @@ public class GameManager : MonoBehaviour
 
         while (true)
         {
+            // Pause game loop if in debug mode
+            if (debugMode)
+            {
+                yield return null;
+                continue;
+            }
+
             // Generate and display a new note
             GenerateNewNote();
-            
+
             // Wait for player to answer
             waitingForAnswer = true;
             while (waitingForAnswer)
             {
+                // Check if debug mode was enabled while waiting
+                if (debugMode)
+                {
+                    waitingForAnswer = false;
+                    break;
+                }
                 yield return null;
             }
 
@@ -55,15 +71,16 @@ public class GameManager : MonoBehaviour
     void GenerateNewNote()
     {
         // Generate a random note
-        currentNote = MusicNote.GenerateRandomNote();
+        currentNote = MusicNote.GenerateRandomNote(firstNoteIndex, lastNoteIndex);
         
         // Display it on the staff
         if (staffRenderer != null)
         {
-            staffRenderer.DisplayNote(currentNote);
+            staffRenderer.ClearNotes();
+            staffRenderer.DisplayNote(currentNote, currentNote.BassClef);
         }
 
-        Debug.Log($"New note generated: {currentNote.Name} (pos: " + currentNote.StaffPosition + ")");
+        Debug.Log($"New note generated: {currentNote.GetFullName()} (pos: " + currentNote.StaffPosition + ")");
     }
 
     public void CheckAnswer(MusicNote.NoteName selectedNote)
@@ -122,8 +139,34 @@ public class GameManager : MonoBehaviour
         {
             uiManager.UpdateScore(score);
         }
-        
+
         StopAllCoroutines();
         StartCoroutine(GameLoop());
+    }
+
+    public void SetDebugMode(bool enabled)
+    {
+        debugMode = enabled;
+
+        if (debugMode)
+        {
+            // Disable buttons in debug mode
+            if (uiManager != null)
+            {
+                uiManager.SetButtonsInteractable(false);
+            }
+
+            waitingForAnswer = false;
+        }
+        else
+        {
+            // Re-enable buttons when exiting debug mode
+            if (uiManager != null)
+            {
+                uiManager.SetButtonsInteractable(true);
+            }
+
+            // Game loop will automatically resume and generate a new note
+        }
     }
 }
