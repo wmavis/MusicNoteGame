@@ -170,7 +170,7 @@ public class StaffRenderer : MonoBehaviour
 
         // Set note color
         Renderer renderer = noteObject.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        renderer.material = new Material(Shader.Find("Sprites/Default"));
         renderer.material.color = noteColor;
 
         // Add ledger lines if needed
