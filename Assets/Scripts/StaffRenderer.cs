@@ -170,6 +170,7 @@ public class StaffRenderer : MonoBehaviour
 
         // Set note color
         Renderer renderer = noteObject.GetComponent<Renderer>();
+        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
         renderer.material.color = noteColor;
 
         // Add ledger lines if needed
@@ -285,7 +286,7 @@ public class StaffRenderer : MonoBehaviour
         TMPro.TextMeshPro textMesh = noteLabelObject.AddComponent<TMPro.TextMeshPro>();
         textMesh.text = note.GetFullName();
         textMesh.fontSize = noteLabelFontSize;
-        textMesh.color = Color.black; // Black text for contrast on white note
+        textMesh.color = Color.white; // White text for contrast on black note
         textMesh.alignment = TMPro.TextAlignmentOptions.Center;
 
         // Center the text horizontally and vertically
