@@ -4,16 +4,22 @@ using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
-/// Manages the UI elements including buttons, score, and feedback
+/// Manages the UI elements including buttons, score, lives, feedback, and game over
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     [Header("UI References")]
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI feedbackText;
+    [SerializeField] private TextMeshProUGUI livesText;
     [SerializeField] private Button[] noteButtons; // Buttons for C, D, E, F, G, A, B
-    [SerializeField] private Toggle showNoteNamesToggle; // Toggle for showing note names
-    [SerializeField] private Toggle debugModeToggle; // Toggle for debug mode (show all notes)
+    [SerializeField] private Toggle showNoteNamesToggle;
+    [SerializeField] private Toggle debugModeToggle;
+
+    [Header("Game Over")]
+    [SerializeField] private GameObject gameOverPanel;
+    [SerializeField] private TextMeshProUGUI gameOverScoreText;
+    [SerializeField] private Button restartButton;
 
     [Header("Feedback Settings")]
     [SerializeField] private Color correctColor = Color.green;
@@ -29,18 +35,16 @@ public class UIManager : MonoBehaviour
         gameManager = FindFirstObjectByType<GameManager>();
         staffRenderer = FindFirstObjectByType<StaffRenderer>();
 
-        // Setup note buttons
         SetupNoteButtons();
-
-        // Setup show note names toggle
         SetupShowNoteNamesToggle();
-
-        // Setup debug mode toggle
         SetupDebugModeToggle();
+        SetupRestartButton();
 
-        // Initialize UI
         UpdateScore(0);
         ClearFeedback();
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
     }
 
     void Update()
@@ -50,9 +54,7 @@ public class UIManager : MonoBehaviour
         {
             feedbackTimer -= Time.deltaTime;
             if (feedbackTimer <= 0)
-            {
                 ClearFeedback();
-            }
         }
 
         // Handle keyboard input for note answers
@@ -71,7 +73,6 @@ public class UIManager : MonoBehaviour
 
     private void SetupNoteButtons()
     {
-        // Assign click handlers to each note button
         MusicNote.NoteName[] noteNames = new MusicNote.NoteName[]
         {
             MusicNote.NoteName.C,
@@ -88,13 +89,16 @@ public class UIManager : MonoBehaviour
             MusicNote.NoteName noteName = noteNames[i];
             noteButtons[i].onClick.AddListener(() => OnNoteButtonClicked(noteName));
 
-            // Set button text
             TextMeshProUGUI buttonText = noteButtons[i].GetComponentInChildren<TextMeshProUGUI>();
             if (buttonText != null)
-            {
                 buttonText.text = noteName.ToString();
-            }
         }
+    }
+
+    private void SetupRestartButton()
+    {
+        if (restartButton != null)
+            restartButton.onClick.AddListener(() => gameManager?.RestartGame());
     }
 
     private void SetupShowNoteNamesToggle()
@@ -108,10 +112,7 @@ public class UIManager : MonoBehaviour
 
     private void OnShowNoteNamesToggled(bool isOn)
     {
-        if (staffRenderer != null)
-        {
-            staffRenderer.SetShowNoteNames(isOn);
-        }
+        staffRenderer?.SetShowNoteNames(isOn);
     }
 
     private void SetupDebugModeToggle()
@@ -125,45 +126,34 @@ public class UIManager : MonoBehaviour
 
     private void OnDebugModeToggled(bool isOn)
     {
-        if (staffRenderer != null)
-        {
-            staffRenderer.SetDebugMode(isOn);
-        }
-
-        if (gameManager != null)
-        {
-            gameManager.SetDebugMode(isOn);
-        }
+        staffRenderer?.SetDebugMode(isOn);
+        gameManager?.SetDebugMode(isOn);
     }
 
     private void OnNoteButtonClicked(MusicNote.NoteName selectedNote)
     {
-        if (gameManager != null)
-        {
-            gameManager.CheckAnswer(selectedNote);
-        }
+        gameManager?.CheckAnswer(selectedNote);
     }
 
     public void UpdateScore(int score)
     {
         if (scoreText != null)
-        {
             scoreText.text = $"Score: {score}";
-        }
+    }
+
+    public void UpdateLives(int lives, int maxLives)
+    {
+        if (livesText != null)
+            livesText.text = $"Lives: {lives}/{maxLives}";
     }
 
     public void ShowCorrectFeedback(string fullNoteName = "")
     {
         if (feedbackText != null)
         {
-            if (!string.IsNullOrEmpty(fullNoteName))
-            {
-                feedbackText.text = $"Correct! ✓ ({fullNoteName})";
-            }
-            else
-            {
-                feedbackText.text = "Correct! ✓";
-            }
+            feedbackText.text = string.IsNullOrEmpty(fullNoteName)
+                ? "Correct!"
+                : $"Correct! ({fullNoteName})";
             feedbackText.color = correctColor;
             feedbackTimer = feedbackDisplayTime;
         }
@@ -173,32 +163,38 @@ public class UIManager : MonoBehaviour
     {
         if (feedbackText != null)
         {
-            if (!string.IsNullOrEmpty(fullNoteName))
-            {
-                feedbackText.text = $"Incorrect! The answer was {correctAnswer} ({fullNoteName})";
-            }
-            else
-            {
-                feedbackText.text = $"Incorrect! The answer was {correctAnswer}";
-            }
+            feedbackText.text = string.IsNullOrEmpty(fullNoteName)
+                ? $"Incorrect! The answer was {correctAnswer}"
+                : $"Incorrect! The answer was {correctAnswer} ({fullNoteName})";
             feedbackText.color = incorrectColor;
             feedbackTimer = feedbackDisplayTime;
         }
     }
 
+    public void ShowGameOver(int finalScore)
+    {
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
+
+        if (gameOverScoreText != null)
+            gameOverScoreText.text = $"Final Score: {finalScore}";
+    }
+
+    public void HideGameOver()
+    {
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+    }
+
     private void ClearFeedback()
     {
         if (feedbackText != null)
-        {
             feedbackText.text = "";
-        }
     }
 
     public void SetButtonsInteractable(bool interactable)
     {
         foreach (Button button in noteButtons)
-        {
             button.interactable = interactable;
-        }
     }
 }

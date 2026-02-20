@@ -2,12 +2,13 @@ using UnityEngine;
 using System.Collections;
 
 /// <summary>
-/// Main game controller that manages game flow and logic
+/// Main game controller that manages game flow, scoring, and lives
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     [Header("Game Settings")]
     [SerializeField] private float delayBeforeNextNote = 2f;
+    [SerializeField] private int maxLives = 3;
 
     [Header("References")]
     [SerializeField] private StaffRenderer staffRenderer;
@@ -15,47 +16,47 @@ public class GameManager : MonoBehaviour
 
     private MusicNote currentNote;
     private int score = 0;
+    private int lives;
     private bool waitingForAnswer = false;
     private bool debugMode = false;
+    private bool isGameOver = false;
+
     public static readonly int firstNoteIndex = 9; // C2
     public static readonly int lastNoteIndex = 37; // C6
 
     void Start()
     {
-        // Find references if not assigned
         if (staffRenderer == null)
             staffRenderer = FindFirstObjectByType<StaffRenderer>();
-        
+
         if (uiManager == null)
             uiManager = FindFirstObjectByType<UIManager>();
 
-        // Start the game
+        lives = maxLives;
+        if (uiManager != null)
+            uiManager.UpdateLives(lives, maxLives);
+
         StartCoroutine(GameLoop());
     }
 
     IEnumerator GameLoop()
     {
-        // Wait a moment before starting
         yield return new WaitForSeconds(1f);
 
         while (true)
         {
-            // Pause game loop if in debug mode
-            if (debugMode)
+            if (isGameOver || debugMode)
             {
                 yield return null;
                 continue;
             }
 
-            // Generate and display a new note
             GenerateNewNote();
 
-            // Wait for player to answer
             waitingForAnswer = true;
             while (waitingForAnswer)
             {
-                // Check if debug mode was enabled while waiting
-                if (debugMode)
+                if (debugMode || isGameOver)
                 {
                     waitingForAnswer = false;
                     break;
@@ -63,41 +64,36 @@ public class GameManager : MonoBehaviour
                 yield return null;
             }
 
-            // Wait before showing next note
-            yield return new WaitForSeconds(delayBeforeNextNote);
+            if (!isGameOver)
+                yield return new WaitForSeconds(delayBeforeNextNote);
         }
     }
 
     void GenerateNewNote()
     {
-        // Generate a random note
         currentNote = MusicNote.GenerateRandomNote(firstNoteIndex, lastNoteIndex);
-        
-        // Display it on the staff
+
         if (staffRenderer != null)
         {
             staffRenderer.ClearNotes();
             staffRenderer.DisplayNote(currentNote, currentNote.BassClef);
+            staffRenderer.StartNoteAnimation(OnNoteExpired);
         }
 
-        Debug.Log($"New note generated: {currentNote.GetFullName()} (pos: " + currentNote.StaffPosition + ")");
+        Debug.Log($"New note generated: {currentNote.GetFullName()} (pos: {currentNote.StaffPosition})");
     }
 
     public void CheckAnswer(MusicNote.NoteName selectedNote)
     {
-        if (!waitingForAnswer)
-            return;
+        if (!waitingForAnswer) return;
 
-        // Disable buttons temporarily
+        staffRenderer?.StopNoteAnimation();
+
         if (uiManager != null)
-        {
             uiManager.SetButtonsInteractable(false);
-        }
 
-        // Check if the answer is correct
         if (selectedNote == currentNote.Name)
         {
-            // Correct answer
             score++;
             if (uiManager != null)
             {
@@ -108,37 +104,84 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Incorrect answer
             if (uiManager != null)
-            {
                 uiManager.ShowIncorrectFeedback(currentNote.Name.ToString(), currentNote.GetFullName());
-            }
             Debug.Log($"Incorrect! The correct answer was {currentNote.Name} ({currentNote.GetFullName()})");
+            LoseLife();
         }
 
-        // Re-enable buttons after a short delay
-        StartCoroutine(ReEnableButtons());
+        if (!isGameOver)
+            StartCoroutine(ReEnableButtons());
 
-        // Move to next note
         waitingForAnswer = false;
+    }
+
+    // Called when the note reaches the right edge without an answer
+    private void OnNoteExpired()
+    {
+        if (!waitingForAnswer) return;
+
+        if (uiManager != null)
+        {
+            uiManager.SetButtonsInteractable(false);
+            uiManager.ShowIncorrectFeedback(currentNote.Name.ToString(), currentNote.GetFullName());
+        }
+
+        Debug.Log($"Note expired! The correct answer was {currentNote.Name} ({currentNote.GetFullName()})");
+
+        LoseLife();
+
+        if (!isGameOver)
+            StartCoroutine(ReEnableButtons());
+
+        waitingForAnswer = false;
+    }
+
+    private void LoseLife()
+    {
+        lives--;
+        if (uiManager != null)
+            uiManager.UpdateLives(lives, maxLives);
+
+        if (lives <= 0)
+            GameOver();
+    }
+
+    private void GameOver()
+    {
+        isGameOver = true;
+        waitingForAnswer = false;
+        staffRenderer?.StopNoteAnimation();
+
+        if (uiManager != null)
+            uiManager.ShowGameOver(score);
+
+        Debug.Log("Game Over!");
     }
 
     IEnumerator ReEnableButtons()
     {
         yield return new WaitForSeconds(0.5f);
         if (uiManager != null)
-        {
             uiManager.SetButtonsInteractable(true);
-        }
     }
 
-    public void ResetGame()
+    public void RestartGame()
     {
+        isGameOver = false;
         score = 0;
+        lives = maxLives;
+
         if (uiManager != null)
         {
             uiManager.UpdateScore(score);
+            uiManager.UpdateLives(lives, maxLives);
+            uiManager.HideGameOver();
+            uiManager.SetButtonsInteractable(true);
         }
+
+        if (staffRenderer != null)
+            staffRenderer.ClearNotes();
 
         StopAllCoroutines();
         StartCoroutine(GameLoop());
@@ -150,23 +193,15 @@ public class GameManager : MonoBehaviour
 
         if (debugMode)
         {
-            // Disable buttons in debug mode
+            staffRenderer?.StopNoteAnimation();
             if (uiManager != null)
-            {
                 uiManager.SetButtonsInteractable(false);
-            }
-
             waitingForAnswer = false;
         }
         else
         {
-            // Re-enable buttons when exiting debug mode
             if (uiManager != null)
-            {
                 uiManager.SetButtonsInteractable(true);
-            }
-
-            // Game loop will automatically resume and generate a new note
         }
     }
 }

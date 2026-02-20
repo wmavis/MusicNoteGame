@@ -13,15 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0] - ?
 
-### Add the concept of lives - too many incorrect answers and game over
-
 ## [1.5.0] - ?
 
 ### Add sound effects for correct and incorrect answers
+### Animate note flying up for correct and note falling for incorrect answers
 
-## [1.4.0] - ?
+## [1.4.0] - 2026-02-19
 
-### Animate notes along staff
+### Added
+- **Lives System** - Players start with 3 lives; incorrect answers and expired notes each cost a life
+- **Game Over** - Game ends when all lives are lost; shows final score and a restart button
+- **Note Animation** - Notes slide from left to right across the staff
+- **Note Expiry** - If a note reaches the right edge unanswered, it counts as incorrect and costs a life
+
+### Changed
+- **Note Group Architecture** - Note sprite, ledger lines, and label are now parented to a group container so they translate together during animation
+- **UIManager** - Added `Lives` text, `Game Over` panel with final score text, and `Restart` button (assign in Inspector)
 
 ## [1.3.0] - 2026-02-19
 

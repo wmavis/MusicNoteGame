@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -21,6 +22,10 @@ public class StaffRenderer : MonoBehaviour
     [SerializeField] private bool showNoteNames = false;
     [SerializeField] private float noteLabelFontSize = 4f;
 
+    [Header("Note Animation")]
+    [SerializeField] private float noteTravelTime = 6f;
+    [SerializeField] private float noteStartXOffset = 4f; // Units from left edge where note appears
+
     [Header("Clef Symbols")]
     [SerializeField] private Sprite trebleClefSprite;
     [SerializeField] private Sprite bassClefSprite;
@@ -30,11 +35,14 @@ public class StaffRenderer : MonoBehaviour
     [Header("Debug Settings")]
     [SerializeField] private float debugNoteSpacing = 0.7f; // Horizontal spacing between debug notes
 
+    // Note objects are now noteGroup containers; children (sprite, ledger lines, label) move with them
     private List<GameObject> noteObjects = new List<GameObject>();
     private List<GameObject> noteLabelObjects = new List<GameObject>();
-    private List<GameObject> noteLedgerLineObjects = new List<GameObject>();
-    private MusicNote currentNote; // Store current note for toggle updates
-    private float currentNoteYPos; // Store Y position for label creation
+    private MusicNote currentNote;
+    private float currentNoteYPos;
+    private GameObject currentNoteGroup;
+    private Coroutine animationCoroutine;
+
     private LineRenderer[] trebleStaffLines;
     private LineRenderer[] bassStaffLines;
     private GameObject trebleClefObject;
@@ -54,18 +62,9 @@ public class StaffRenderer : MonoBehaviour
 
     void CreateGrandStaff()
     {
-        // Calculate staff positions to maintain correct musical relationships
-        //
-        // In standard notation:
-        // - Treble staff middle line = B4
-        // - Bass staff middle line = D3
-        // - B4 is 6 positions above Middle C (C4)
-        // - D3 is 6 positions below Middle C
-        // - Each position = lineSpacing / 2
-
-        float middleCPosition = 0f; // Use screen center as reference
-        trebleStaffCenter = middleCPosition + 3 * lineSpacing + staffGap / 2; // B4 at 3 * lineSpacing above C4
-        bassStaffCenter = middleCPosition - 3 * lineSpacing - staffGap / 2;    // D3 at 3 * lineSpacing below C4
+        float middleCPosition = 0f;
+        trebleStaffCenter = middleCPosition + 3 * lineSpacing + staffGap / 2;
+        bassStaffCenter = middleCPosition - 3 * lineSpacing - staffGap / 2;
 
         Debug.Log("Middle C Position: " + middleCPosition);
         Debug.Log("Treble Staff Center Y (B4): " + trebleStaffCenter);
@@ -88,7 +87,7 @@ public class StaffRenderer : MonoBehaviour
             line.positionCount = 2;
             line.useWorldSpace = false;
 
-            float yPos = trebleStaffCenter + (i - 2) * lineSpacing; // -2 to center on middle line
+            float yPos = trebleStaffCenter + (i - 2) * lineSpacing;
             line.SetPosition(0, new Vector3(-staffWidth / 2, yPos, 0));
             line.SetPosition(1, new Vector3(staffWidth / 2, yPos, 0));
 
@@ -101,7 +100,6 @@ public class StaffRenderer : MonoBehaviour
         {
             GameObject lineObj = new GameObject($"BassStaffLine_{i}");
             lineObj.transform.SetParent(transform);
-            //lineObj.transform.position = new Vector3(0, 0, 0);
 
             LineRenderer line = lineObj.AddComponent<LineRenderer>();
             line.material = new Material(Shader.Find("Sprites/Default"));
@@ -112,23 +110,20 @@ public class StaffRenderer : MonoBehaviour
             line.positionCount = 2;
             line.useWorldSpace = false;
 
-            float yPos = bassStaffCenter + (i - 2) * lineSpacing; // -2 to center on middle line
+            float yPos = bassStaffCenter + (i - 2) * lineSpacing;
             line.SetPosition(0, new Vector3(-staffWidth / 2, yPos, 0));
             line.SetPosition(1, new Vector3(staffWidth / 2, yPos, 0));
 
             bassStaffLines[i] = line;
         }
 
-        // Create clef symbols (placeholder for now - will need sprites)
         CreateClefSymbols();
 
-        // Center the staff
         transform.position = new Vector3(0, 2, 0);
     }
 
     void CreateClefSymbols()
     {
-        // Treble clef symbol
         trebleClefObject = new GameObject("TrebleClef");
         trebleClefObject.transform.SetParent(transform);
         SpriteRenderer trebleRenderer = trebleClefObject.AddComponent<SpriteRenderer>();
@@ -139,7 +134,6 @@ public class StaffRenderer : MonoBehaviour
         trebleClefObject.transform.localScale = new Vector3(clefScale, clefScale, 1f);
         Debug.Log($"Treble Clef - World Pos: {trebleClefObject.transform.position}, Local Pos: {trebleClefObject.transform.localPosition}, Sorting Order: {trebleRenderer.sortingOrder}, Sprite Assigned: {trebleRenderer.sprite != null}");
 
-        // Bass clef symbol
         bassClefObject = new GameObject("BassClef");
         bassClefObject.transform.SetParent(transform);
         SpriteRenderer bassRenderer = bassClefObject.AddComponent<SpriteRenderer>();
@@ -151,70 +145,65 @@ public class StaffRenderer : MonoBehaviour
         Debug.Log($"Bass Clef - World Pos: {bassClefObject.transform.position}, Local Pos: {bassClefObject.transform.localPosition}, Sorting Order: {bassRenderer.sortingOrder}, Sprite Assigned: {bassRenderer.sprite != null}");
     }
 
+    // Regular play: note starts at the left edge of the staff
     public void DisplayNote(MusicNote note, bool bassClef)
     {
-        DisplayNote(note, 0, bassClef);
+        DisplayNote(note, -staffWidth / 2 + noteStartXOffset, bassClef);
     }
 
+    // Debug mode: note placed at a specific X position
     public void DisplayNote(MusicNote note, float noteXPos, bool bassClef)
     {
-        // Store current note and position for toggle updates
         currentNote = note;
         currentNoteYPos = CalculateNoteYPosition(note.StaffPosition, bassClef);
 
-        // Create new note
-        GameObject noteObject = new GameObject($"Note_{note.GetFullName()}");
-        noteObject.transform.SetParent(transform);
-        noteObject.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, 0f);
-        noteObject.transform.localScale = new Vector3(noteSize, noteSize, 1f);
-        noteObjects.Add(noteObject);
+        // Create a group container so sprite, ledger lines, and label all move together
+        GameObject noteGroup = new GameObject($"NoteGroup_{note.GetFullName()}");
+        noteGroup.transform.SetParent(transform);
+        noteGroup.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, 0f);
+        noteObjects.Add(noteGroup);
+        currentNoteGroup = noteGroup;
 
-        // Render as whole note sprite
-        SpriteRenderer sr = noteObject.AddComponent<SpriteRenderer>();
+        // Note sprite as child of group
+        GameObject noteSprite = new GameObject("NoteSprite");
+        noteSprite.transform.SetParent(noteGroup.transform);
+        noteSprite.transform.localPosition = Vector3.zero;
+        noteSprite.transform.localScale = new Vector3(noteSize, noteSize, 1f);
+
+        SpriteRenderer sr = noteSprite.AddComponent<SpriteRenderer>();
         sr.sprite = wholeNoteSprite;
         sr.color = noteColor;
         sr.sortingOrder = noteSortingOrder;
 
-        // Add ledger lines if needed
-        AddLedgerLinesIfNeeded(note.StaffPosition, noteXPos, currentNoteYPos);
+        // Ledger lines as children of group (they translate with the note)
+        AddLedgerLinesIfNeeded(note.StaffPosition, noteGroup, currentNoteYPos);
 
-        // Create note label if enabled
         if (showNoteNames)
-        {
-            CreateNoteLabel(note, noteXPos, currentNoteYPos);
-        }
+            CreateNoteLabel(note, noteGroup.transform);
     }
 
     private float CalculateNoteYPosition(int staffPosition, bool bassClef)
     {
-        // staffPosition is relative to Middle C (C4) = 0
-        // Each position moves up one line or space (lineSpacing / 2)
-        // Middle C is at Y positions staffGap/2 (right hand) and -staffGap/2 (left hand)
-
         float middleCPosition = bassClef ? -staffGap / 2 : staffGap / 2;
         return middleCPosition + staffPosition * (lineSpacing / 2);
     }
 
-    private void AddLedgerLinesIfNeeded(int staffPosition, float noteXPos, float noteYPos)
+    private void AddLedgerLinesIfNeeded(int staffPosition, GameObject noteGroup, float noteYPos)
     {
-        // Determine if ledger lines are needed
-        // Treble staff: E4 (bottom line) to F5 (top line)
-        // Bass staff: G2 (bottom line) to A3 (top line)
-        float trebleBottom = trebleStaffCenter - lineSpacing * 2; // E4 (position 2)
-        float trebleTop = trebleStaffCenter + lineSpacing * 2;    // F5 (position 10)
-        float bassBottom = bassStaffCenter - lineSpacing * 2;     // G2 (position -10)
-        float bassTop = bassStaffCenter + lineSpacing * 2;        // A3 (position -2)
-        float center = (trebleStaffCenter + bassStaffCenter) / 2; // 0
+        float trebleBottom = trebleStaffCenter - lineSpacing * 2;
+        float trebleTop = trebleStaffCenter + lineSpacing * 2;
+        float bassBottom = bassStaffCenter - lineSpacing * 2;
+        float bassTop = bassStaffCenter + lineSpacing * 2;
+        float center = (trebleStaffCenter + bassStaffCenter) / 2;
         Debug.Log($"Treble: {trebleTop} to {trebleBottom}, Bass: {bassTop} to {bassBottom}");
 
-        // Ledger lines below treble staff (between staves and for Middle C)
+        // Ledger lines below treble staff (Middle C area)
         if (noteYPos < trebleBottom && noteYPos > center)
         {
-            // Middle C and notes between staves
             float currentY = trebleBottom - lineSpacing;
             while (currentY >= noteYPos - 0.01f)
             {
-                CreateLedgerLine(noteXPos, currentY);
+                CreateLedgerLine(noteGroup, currentY - noteYPos);
                 currentY -= lineSpacing;
             }
         }
@@ -225,7 +214,7 @@ public class StaffRenderer : MonoBehaviour
             float currentY = trebleTop + lineSpacing;
             while (currentY <= noteYPos + 0.01f)
             {
-                CreateLedgerLine(noteXPos, currentY);
+                CreateLedgerLine(noteGroup, currentY - noteYPos);
                 currentY += lineSpacing;
             }
         }
@@ -236,7 +225,7 @@ public class StaffRenderer : MonoBehaviour
             float currentY = bassBottom - lineSpacing;
             while (currentY >= noteYPos - 0.01f)
             {
-                CreateLedgerLine(noteXPos, currentY);
+                CreateLedgerLine(noteGroup, currentY - noteYPos);
                 currentY -= lineSpacing;
             }
         }
@@ -247,17 +236,18 @@ public class StaffRenderer : MonoBehaviour
             float currentY = bassTop + lineSpacing;
             while (currentY <= noteYPos + 0.01f)
             {
-                CreateLedgerLine(noteXPos, currentY);
+                CreateLedgerLine(noteGroup, currentY - noteYPos);
                 currentY += lineSpacing;
             }
         }
     }
 
-    private void CreateLedgerLine(float xPos, float yPos)
+    // relativeY is the ledger line's Y offset from the note group center
+    private void CreateLedgerLine(GameObject noteGroup, float relativeY)
     {
         GameObject lineObj = new GameObject("LedgerLine");
-        lineObj.transform.SetParent(transform);
-        lineObj.transform.localPosition = new Vector3(0, 0, 0);
+        lineObj.transform.SetParent(noteGroup.transform);
+        lineObj.transform.localPosition = Vector3.zero;
 
         LineRenderer line = lineObj.AddComponent<LineRenderer>();
         line.material = new Material(Shader.Find("Sprites/Default"));
@@ -268,102 +258,109 @@ public class StaffRenderer : MonoBehaviour
         line.positionCount = 2;
         line.useWorldSpace = false;
 
-        // Ledger lines are shorter than staff lines
         float ledgerWidth = noteSize * 1.5f;
-        line.SetPosition(0, new Vector3(xPos - ledgerWidth / 2, yPos, 0));
-        line.SetPosition(1, new Vector3(xPos + ledgerWidth / 2, yPos, 0));
-
-        noteLedgerLineObjects.Add(lineObj);
+        line.SetPosition(0, new Vector3(-ledgerWidth / 2, relativeY, 0));
+        line.SetPosition(1, new Vector3(ledgerWidth / 2, relativeY, 0));
     }
 
-    private void CreateNoteLabel(MusicNote note, float noteXPos, float noteYPos)
+    private void CreateNoteLabel(MusicNote note, Transform parent)
     {
-        // Create a new GameObject for the label
         GameObject noteLabelObject = new GameObject("NoteLabel");
-        noteLabelObject.transform.SetParent(transform);
-        noteLabelObject.transform.localPosition = new Vector3(noteXPos, noteYPos, -0.5f);
+        noteLabelObject.transform.SetParent(parent);
+        noteLabelObject.transform.localPosition = new Vector3(0, 0, -0.5f);
         noteLabelObjects.Add(noteLabelObject);
 
-        // Add TextMeshPro component
         TMPro.TextMeshPro textMesh = noteLabelObject.AddComponent<TMPro.TextMeshPro>();
         textMesh.text = note.GetFullName();
         textMesh.fontSize = noteLabelFontSize;
-        textMesh.color = Color.white; // White text for contrast on black note
+        textMesh.color = Color.white;
         textMesh.alignment = TMPro.TextAlignmentOptions.Center;
 
-        // Center the text horizontally and vertically
         RectTransform rectTransform = noteLabelObject.GetComponent<RectTransform>();
         if (rectTransform != null)
-        {
             rectTransform.sizeDelta = new Vector2(2f, 1f);
-        }
 
-        // Set sorting layer to render in front
         textMesh.sortingOrder = 10;
     }
 
     public void ClearNotes()
     {
-        // Clear all note objects
-        foreach (GameObject noteObj in noteObjects)
+        StopNoteAnimation();
+
+        foreach (GameObject noteGroup in noteObjects)
         {
-            if (noteObj != null)
-            {
-                Destroy(noteObj);
-            }
+            if (noteGroup != null)
+                Destroy(noteGroup);
         }
         noteObjects.Clear();
-
-        // Clear all note labels
-        foreach (GameObject labelObj in noteLabelObjects)
-        {
-            if (labelObj != null)
-            {
-                Destroy(labelObj);
-            }
-        }
-        noteLabelObjects.Clear();
-
-        // Clear all notes ledger lines
-        foreach (GameObject ledgerLine in noteLedgerLineObjects)
-        {
-            if (ledgerLine != null)
-            {
-                Destroy(ledgerLine);
-            }
-        }
-        noteLedgerLineObjects.Clear();
+        noteLabelObjects.Clear();  // Destroyed with parent noteGroup
+        currentNoteGroup = null;
     }
+
+    // --- Animation ---
+
+    public void StartNoteAnimation(System.Action onExpired)
+    {
+        if (currentNoteGroup == null) return;
+        StopNoteAnimation();
+        float endX = staffWidth / 2;
+        animationCoroutine = StartCoroutine(AnimateNote(currentNoteGroup, endX, onExpired));
+    }
+
+    public void StopNoteAnimation()
+    {
+        if (animationCoroutine != null)
+        {
+            StopCoroutine(animationCoroutine);
+            animationCoroutine = null;
+        }
+    }
+
+    private IEnumerator AnimateNote(GameObject noteGroup, float endX, System.Action onComplete)
+    {
+        if (noteGroup == null) yield break;
+
+        float startX = noteGroup.transform.localPosition.x;
+        float elapsed = 0f;
+
+        while (elapsed < noteTravelTime)
+        {
+            if (noteGroup == null) yield break;
+
+            float t = elapsed / noteTravelTime;
+            Vector3 pos = noteGroup.transform.localPosition;
+            noteGroup.transform.localPosition = new Vector3(Mathf.Lerp(startX, endX, t), pos.y, pos.z);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        animationCoroutine = null;
+        onComplete?.Invoke();
+    }
+
+    // --- Show Note Names ---
 
     public void SetShowNoteNames(bool show)
     {
         showNoteNames = show;
 
-        // Update the currently displayed note's label
         if (currentNote != null && noteObjects.Count > 0)
         {
-            if (show && noteLabelObjects.Count == 0)
+            if (show && noteLabelObjects.Count == 0 && currentNoteGroup != null)
             {
-                // Show label for current note
-                CreateNoteLabel(currentNote, 0, currentNoteYPos);
+                CreateNoteLabel(currentNote, currentNoteGroup.transform);
             }
             else if (!show && noteLabelObjects.Count > 0)
             {
-                foreach(GameObject noteLabelObject in noteLabelObjects)
-                {
+                foreach (GameObject noteLabelObject in noteLabelObjects)
                     Destroy(noteLabelObject);
-
-                }
                 noteLabelObjects.Clear();
             }
         }
 
-        // Update debug mode labels if in debug mode
         if (debugMode)
-        {
-            // Refresh debug display to show/hide labels
             DisplayAllDebugNotes();
-        }
     }
 
     public bool GetShowNoteNames()
@@ -371,18 +368,18 @@ public class StaffRenderer : MonoBehaviour
         return showNoteNames;
     }
 
+    // --- Debug Mode ---
+
     public void SetDebugMode(bool enabled)
     {
         debugMode = enabled;
 
         if (debugMode)
         {
-            // Show all notes
             DisplayAllDebugNotes();
         }
         else
         {
-            // Clear all debug notes
             ClearNotes();
         }
     }
@@ -394,29 +391,21 @@ public class StaffRenderer : MonoBehaviour
 
     private void DisplayAllDebugNotes()
     {
-        // Clear any existing notes first
         ClearNotes();
 
-        // Get list of notes
         List<MusicNote> allNotes = MusicNote.GetAllNotes();
 
-        // Calculate starting X position to center all notes
         float totalWidth = (allNotes.Count - 1) * debugNoteSpacing;
         float startX = -totalWidth / 2;
 
         Debug.Log($"Displaying {allNotes.Count} debug notes with spacing {debugNoteSpacing}. Total width: {totalWidth}, Starting X: {startX}");
 
         int middleCIndex = (allNotes.Count - 1) / 2;
-        // Display each bass clef note
-        for (int i = 0; i <= middleCIndex + 2; i++)
-        {
-            DisplayNote(allNotes[i], startX + i * debugNoteSpacing, true);
-        }
 
-        // Display each treble clef note
+        for (int i = 0; i <= middleCIndex + 2; i++)
+            DisplayNote(allNotes[i], startX + i * debugNoteSpacing, true);
+
         for (int i = middleCIndex - 2; i < allNotes.Count; i++)
-        {
             DisplayNote(allNotes[i], startX + i * debugNoteSpacing, false);
-        }
     }
 }
