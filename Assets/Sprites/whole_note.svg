@@ -7,9 +7,8 @@
       Right point: (153.12, 35.77)
       Left  point: ( 46.88, 64.23)
     fill-rule="evenodd" makes the inner sub-path a transparent hole.
-    White fill so SpriteRenderer.color tinting works correctly.
   -->
-  <path fill="white" fill-rule="evenodd"
+  <path fill="black" fill-rule="evenodd"
     d="M 190,50
        A 90,42 0 1 1 10,50
        A 90,42 0 1 1 190,50 Z
