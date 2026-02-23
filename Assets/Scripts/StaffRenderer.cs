@@ -26,6 +26,10 @@ public class StaffRenderer : MonoBehaviour
     [SerializeField] private float noteTravelTime = 6f;
     [SerializeField] private float noteStartXOffset = 4f; // Units from left edge where note appears
 
+    [Header("Answer Animation")]
+    [SerializeField] private float answerAnimDuration = 1.5f;
+    [SerializeField] private float answerAnimDistance = 3f;
+
     [Header("Clef Symbols")]
     [SerializeField] private Sprite trebleClefSprite;
     [SerializeField] private Sprite bassClefSprite;
@@ -42,6 +46,7 @@ public class StaffRenderer : MonoBehaviour
     private float currentNoteYPos;
     private GameObject currentNoteGroup;
     private Coroutine animationCoroutine;
+    private Coroutine answerAnimCoroutine;
 
     private LineRenderer[] trebleStaffLines;
     private LineRenderer[] bassStaffLines;
@@ -287,6 +292,8 @@ public class StaffRenderer : MonoBehaviour
     {
         StopNoteAnimation();
 
+        if (answerAnimCoroutine != null) { StopCoroutine(answerAnimCoroutine); answerAnimCoroutine = null; }
+
         foreach (GameObject noteGroup in noteObjects)
         {
             if (noteGroup != null)
@@ -337,6 +344,44 @@ public class StaffRenderer : MonoBehaviour
 
         animationCoroutine = null;
         onComplete?.Invoke();
+    }
+
+    // --- Answer Animation ---
+
+    public void PlayAnswerAnimation(bool correct)
+    {
+        if (currentNoteGroup == null) return;
+        if (answerAnimCoroutine != null) StopCoroutine(answerAnimCoroutine);
+
+        GameObject noteGroup = currentNoteGroup;
+        SpriteRenderer sr = noteGroup.transform.Find("NoteSprite")?.GetComponent<SpriteRenderer>();
+        float direction = correct ? 1f : -1f;
+        answerAnimCoroutine = StartCoroutine(AnswerAnimCoroutine(noteGroup, sr, direction));
+    }
+
+    public void StopAnswerAnimation()
+    {
+        if (answerAnimCoroutine != null) { StopCoroutine(answerAnimCoroutine); answerAnimCoroutine = null; }
+    }
+
+    private IEnumerator AnswerAnimCoroutine(GameObject noteGroup, SpriteRenderer sr, float direction)
+    {
+        if (noteGroup == null) yield break;
+        Vector3 startPos   = noteGroup.transform.localPosition;
+        Color   startColor = sr != null ? sr.color : Color.black;
+        float elapsed = 0f;
+        while (elapsed < answerAnimDuration)
+        {
+            if (noteGroup == null) yield break;
+            float t = elapsed / answerAnimDuration;
+            Vector3 pos = noteGroup.transform.localPosition;
+            noteGroup.transform.localPosition = new Vector3(pos.x, startPos.y + answerAnimDistance * direction * t, pos.z);
+            if (sr != null)
+                sr.color = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(1f, 0f, t));
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        answerAnimCoroutine = null;
     }
 
     // --- Show Note Names ---

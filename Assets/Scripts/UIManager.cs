@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using TMPro;
+using System.Collections;
 
 /// <summary>
 /// Manages the UI elements including buttons, score, lives, feedback, and game over
@@ -29,6 +30,8 @@ public class UIManager : MonoBehaviour
     private GameManager gameManager;
     private StaffRenderer staffRenderer;
     private float feedbackTimer = 0f;
+    private RawImage blurBackdrop;
+    private Texture2D blurTexture;
 
     void Start()
     {
@@ -173,17 +176,119 @@ public class UIManager : MonoBehaviour
 
     public void ShowGameOver(int finalScore)
     {
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(true);
-
         if (gameOverScoreText != null)
             gameOverScoreText.text = $"Final Score: {finalScore}";
+
+        StartCoroutine(ShowGameOverWithBlur());
+    }
+
+    private IEnumerator ShowGameOverWithBlur()
+    {
+        // Wait until the frame has fully rendered (no panel overlay yet)
+        yield return new WaitForEndOfFrame();
+
+        // Capture the scene
+        Texture2D screenshot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+        screenshot.Apply();
+
+        // Replace any previous blur texture
+        if (blurTexture != null) Destroy(blurTexture);
+        blurTexture = BlurScreenshot(screenshot);
+        Destroy(screenshot);
+
+        if (blurBackdrop == null && gameOverPanel != null)
+        {
+            // Parent to the gameOverPanel itself — no new Canvases, no sorting tricks.
+            // Filling a known parent with stretch anchors always works regardless of
+            // Canvas render mode, Canvas Scaler, or reference resolution.
+            GameObject go = new GameObject("BlurBackdrop");
+            go.transform.SetParent(gameOverPanel.transform, false);
+            go.transform.SetAsFirstSibling(); // render behind panel's text and buttons
+
+            // LayoutElement.ignoreLayout stops any Layout Group on the panel from
+            // overriding the RectTransform size/position.
+            LayoutElement le = go.AddComponent<LayoutElement>();
+            le.ignoreLayout = true;
+
+            blurBackdrop = go.AddComponent<RawImage>();
+            blurBackdrop.raycastTarget = false;
+
+            RectTransform rt = blurBackdrop.rectTransform;
+            rt.anchorMin        = Vector2.zero;
+            rt.anchorMax        = Vector2.one;
+            rt.sizeDelta        = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        if (blurBackdrop != null)
+        {
+            blurBackdrop.texture = blurTexture;
+            blurBackdrop.gameObject.SetActive(true);
+        }
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
+    }
+
+    // 4× downsample + 3-pass separable box blur → bilinear upscale on GPU when displayed
+    private static Texture2D BlurScreenshot(Texture2D source)
+    {
+        const int scale  = 4;
+        const int radius = 4;
+        int sw = source.width  / scale;
+        int sh = source.height / scale;
+
+        Color32[] src    = source.GetPixels32();
+        Color32[] pixels = new Color32[sw * sh];
+
+        // Nearest-neighbour downsample
+        for (int y = 0; y < sh; y++)
+            for (int x = 0; x < sw; x++)
+                pixels[y * sw + x] = src[y * scale * source.width + x * scale];
+
+        // Separable box blur, 3 passes
+        Color32[] temp = new Color32[sw * sh];
+        for (int pass = 0; pass < 3; pass++)
+        {
+            // Horizontal
+            for (int y = 0; y < sh; y++)
+                for (int x = 0; x < sw; x++)
+                {
+                    int r = 0, g = 0, b = 0, n = 0;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        Color32 p = pixels[y * sw + Mathf.Clamp(x + k, 0, sw - 1)];
+                        r += p.r; g += p.g; b += p.b; n++;
+                    }
+                    temp[y * sw + x] = new Color32((byte)(r / n), (byte)(g / n), (byte)(b / n), 255);
+                }
+            // Vertical
+            for (int y = 0; y < sh; y++)
+                for (int x = 0; x < sw; x++)
+                {
+                    int r = 0, g = 0, b = 0, n = 0;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        Color32 p = temp[Mathf.Clamp(y + k, 0, sh - 1) * sw + x];
+                        r += p.r; g += p.g; b += p.b; n++;
+                    }
+                    pixels[y * sw + x] = new Color32((byte)(r / n), (byte)(g / n), (byte)(b / n), 255);
+                }
+        }
+
+        Texture2D result = new Texture2D(sw, sh, TextureFormat.RGB24, false);
+        result.filterMode = FilterMode.Bilinear; // GPU handles smooth upscaling
+        result.SetPixels32(pixels);
+        result.Apply();
+        return result;
     }
 
     public void HideGameOver()
     {
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
+        // blurBackdrop is a child of gameOverPanel and deactivates with it
     }
 
     private void ClearFeedback()

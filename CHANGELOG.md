@@ -13,10 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0] - ?
 
-## [1.5.0] - ?
+## [1.5.0] - 2026-02-22
 
-### Add sound effects for correct and incorrect answers
-### Animate note flying up for correct and note falling for incorrect answers
+### Added
+- **Sound Effects** - Procedural audio plays on correct/incorrect answers and note expiry; correct answer plays the actual pitch of the note, incorrect/expired plays a low thud
+- **Answer Animation** - Note flies upward and fades out on a correct answer; falls downward and fades out on an incorrect answer or expiry
+- **Audio Inspector Fields** - `GameManager` exposes `Correct Sound Clip`, `Incorrect Sound Clip`, and `Audio Volume` fields to override procedural sounds with custom `.wav`/`.ogg` assets
+- **Answer Animation Inspector Fields** - `StaffRenderer` exposes `Answer Anim Duration` (default 1.5s) and `Answer Anim Distance` (default 3 units) fields
 
 ## [1.4.0] - 2026-02-19
 
