@@ -327,23 +327,33 @@ public class StaffRenderer : MonoBehaviour
     {
         if (noteGroup == null) yield break;
 
-        float startX = noteGroup.transform.localPosition.x;
-        float elapsed = 0f;
+        // totalDistance is fixed at spawn time; speed = totalDistance / noteTravelTime is
+        // re-evaluated every frame so that a mid-game difficulty change takes effect immediately.
+        float totalDistance = endX - noteGroup.transform.localPosition.x;
 
-        while (elapsed < noteTravelTime)
+        while (true)
         {
             if (noteGroup == null) yield break;
 
-            float t = elapsed / noteTravelTime;
+            float speed = totalDistance / noteTravelTime; // units per second
             Vector3 pos = noteGroup.transform.localPosition;
-            noteGroup.transform.localPosition = new Vector3(Mathf.Lerp(startX, endX, t), pos.y, pos.z);
+            float newX = pos.x + speed * Time.deltaTime;
 
-            elapsed += Time.deltaTime;
+            if (newX >= endX)
+            {
+                animationCoroutine = null;
+                onComplete?.Invoke();
+                yield break;
+            }
+
+            noteGroup.transform.localPosition = new Vector3(newX, pos.y, pos.z);
             yield return null;
         }
+    }
 
-        animationCoroutine = null;
-        onComplete?.Invoke();
+    public void SetNoteTravelTime(float time)
+    {
+        noteTravelTime = Mathf.Max(0.5f, time);
     }
 
     // --- Answer Animation ---

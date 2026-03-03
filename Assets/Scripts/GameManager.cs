@@ -6,9 +6,38 @@ using System.Collections;
 /// </summary>
 public class GameManager : MonoBehaviour
 {
+    public enum DifficultyLevel { Adagio = 0, Andante = 1, Moderato = 2, Allegro = 3 }
+
+    private struct DifficultySettings
+    {
+        public float baseTravelTime;      // starting note travel time in seconds
+        public float speedIncreasePerScore; // seconds removed from travel time per correct answer
+        public float minTravelTime;       // floor so the note never becomes impossibly fast
+
+        public DifficultySettings(float baseTravelTime, float speedIncreasePerScore, float minTravelTime)
+        {
+            this.baseTravelTime = baseTravelTime;
+            this.speedIncreasePerScore = speedIncreasePerScore;
+            this.minTravelTime = minTravelTime;
+        }
+    }
+
+    // Adagio → Allegro: progressively faster base speed and steeper ramp
+    private static readonly DifficultySettings[] difficultyPresets = new DifficultySettings[]
+    {
+        new DifficultySettings(10f, 0.05f, 5f),   // Adagio
+        new DifficultySettings( 8f, 0.08f, 4f),   // Andante
+        new DifficultySettings( 6f, 0.12f, 2.5f), // Moderato
+        new DifficultySettings( 4f, 0.15f, 1.5f), // Allegro
+    };
+
     [Header("Game Settings")]
     [SerializeField] private float delayBeforeNextNote = 2f;
     [SerializeField] private int maxLives = 3;
+
+    [Header("Difficulty")]
+    [SerializeField] private DifficultyLevel startingDifficulty = DifficultyLevel.Moderato;
+    private DifficultyLevel currentDifficulty;
 
     [Header("References")]
     [SerializeField] private StaffRenderer staffRenderer;
@@ -48,6 +77,9 @@ public class GameManager : MonoBehaviour
         audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
         proceduralIncorrectClip = GeneratePianoSlam();
+
+        currentDifficulty = startingDifficulty;
+        UpdateNoteSpeed();
 
         StartCoroutine(GameLoop());
     }
@@ -112,6 +144,7 @@ public class GameManager : MonoBehaviour
         if (isCorrect)
         {
             score++;
+            UpdateNoteSpeed();
             if (uiManager != null)
             {
                 uiManager.UpdateScore(score);
@@ -191,6 +224,7 @@ public class GameManager : MonoBehaviour
         isGameOver = false;
         score = 0;
         lives = maxLives;
+        UpdateNoteSpeed();
 
         if (uiManager != null)
         {
@@ -299,6 +333,24 @@ public class GameManager : MonoBehaviour
         int[] semitones = { 0, 2, 4, 5, 7, 9, 11 }; // C D E F G A B
         int midi = (note.Octave + 1) * 12 + semitones[(int)note.Name];
         return 440f * Mathf.Pow(2f, (midi - 69) / 12f);
+    }
+
+    // --- Difficulty ---
+
+    public int StartingDifficultyIndex => (int)startingDifficulty;
+
+    public void SetDifficultyByIndex(int index)
+    {
+        currentDifficulty = (DifficultyLevel)Mathf.Clamp(index, 0, difficultyPresets.Length - 1);
+        UpdateNoteSpeed();
+    }
+
+    private void UpdateNoteSpeed()
+    {
+        DifficultySettings s = difficultyPresets[(int)currentDifficulty];
+        float travelTime = Mathf.Max(s.minTravelTime, s.baseTravelTime - s.speedIncreasePerScore * score);
+        staffRenderer?.SetNoteTravelTime(travelTime);
+        Debug.Log($"Note speed: {travelTime:F2}s travel time (difficulty: {currentDifficulty}, score: {score})");
     }
 
     public void SetDebugMode(bool enabled)

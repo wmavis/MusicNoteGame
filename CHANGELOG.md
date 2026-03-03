@@ -11,7 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.0] - ?
 
-## [1.6.0] - ?
+## [1.6.0] - 2026-03-03
+
+### Added
+- **Difficulty Dropdown** - `UIManager` exposes a `TMP_Dropdown` field (`Difficulty Dropdown`) populated with Adagio, Andante, Moderato, and Allegro; changing it mid-game immediately adjusts note speed
+- **Dynamic Difficulty** - Each correct answer shortens the note travel time toward a per-difficulty minimum, increasing pressure as the player improves
+- **Difficulty Presets** - Four presets defined in `GameManager`; `Starting Difficulty` Inspector field (default Moderato) controls which preset is active on game start
+- **Speed Persistence** - On restart the selected difficulty is kept; score resets to 0 so note speed resets to that difficulty's base travel time
+
+### Changed
+- **Note Animation** - `StaffRenderer.AnimateNote` switched from lerp-based to velocity-based movement so a mid-game difficulty change takes effect on the currently moving note rather than only the next one
+- **`StaffRenderer`** - Added `SetNoteTravelTime(float)` public method (used by `GameManager` when score or difficulty changes)
 
 ## [1.5.0] - 2026-02-22
 

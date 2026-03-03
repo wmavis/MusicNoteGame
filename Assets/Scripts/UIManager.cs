@@ -16,6 +16,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button[] noteButtons; // Buttons for C, D, E, F, G, A, B
     [SerializeField] private Toggle showNoteNamesToggle;
     [SerializeField] private Toggle debugModeToggle;
+    [SerializeField] private TMP_Dropdown difficultyDropdown;
 
     [Header("Game Over")]
     [SerializeField] private GameObject gameOverPanel;
@@ -42,6 +43,7 @@ public class UIManager : MonoBehaviour
         SetupShowNoteNamesToggle();
         SetupDebugModeToggle();
         SetupRestartButton();
+        SetupDifficultyDropdown();
 
         UpdateScore(0);
         ClearFeedback();
@@ -131,6 +133,25 @@ public class UIManager : MonoBehaviour
     {
         staffRenderer?.SetDebugMode(isOn);
         gameManager?.SetDebugMode(isOn);
+    }
+
+    private void SetupDifficultyDropdown()
+    {
+        if (difficultyDropdown == null) return;
+
+        difficultyDropdown.ClearOptions();
+        difficultyDropdown.AddOptions(new System.Collections.Generic.List<string>
+            { "Adagio - slow", "Andante - walking", "Moderato - moderate", "Allegro - fast" });
+
+        int initialIndex = gameManager != null ? gameManager.StartingDifficultyIndex : 2;
+        difficultyDropdown.SetValueWithoutNotify(initialIndex);
+
+        difficultyDropdown.onValueChanged.AddListener(OnDifficultyChanged);
+    }
+
+    private void OnDifficultyChanged(int index)
+    {
+        gameManager?.SetDifficultyByIndex(index);
     }
 
     private void OnNoteButtonClicked(MusicNote.NoteName selectedNote)
