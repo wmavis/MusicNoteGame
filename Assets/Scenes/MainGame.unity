@@ -969,7 +969,7 @@ MonoBehaviour:
   showNoteNames: 0
   noteLabelFontSize: 4
   noteTravelTime: 6
-  noteStartXOffset: 4
+  noteStartXOffset: 2
   answerAnimDuration: 1.5
   answerAnimDistance: 3
   trebleClefSprite: {fileID: 3286163911610860551, guid: 087ab0f705e17b44c98abfeecd637403, type: 3}
@@ -3629,7 +3629,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09cdca9465345ad4ebbe3ae5f78f2184, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  delayBeforeNextNote: 2
   maxLives: 3
   startingDifficulty: 0
   staffRenderer: {fileID: 595333500}

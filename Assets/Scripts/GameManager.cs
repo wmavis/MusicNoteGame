@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Main game controller that manages game flow, scoring, and lives
@@ -13,26 +14,27 @@ public class GameManager : MonoBehaviour
         public float baseTravelTime;      // starting note travel time in seconds
         public float speedIncreasePerScore; // seconds removed from travel time per correct answer
         public float minTravelTime;       // floor so the note never becomes impossibly fast
+        public float spawnInterval;       // seconds between note spawns
 
-        public DifficultySettings(float baseTravelTime, float speedIncreasePerScore, float minTravelTime)
+        public DifficultySettings(float baseTravelTime, float speedIncreasePerScore, float minTravelTime, float spawnInterval)
         {
             this.baseTravelTime = baseTravelTime;
             this.speedIncreasePerScore = speedIncreasePerScore;
             this.minTravelTime = minTravelTime;
+            this.spawnInterval = spawnInterval;
         }
     }
 
-    // Adagio → Allegro: progressively faster base speed and steeper ramp
+    // Adagio → Allegro: progressively faster base speed, steeper ramp, shorter spawn interval
     private static readonly DifficultySettings[] difficultyPresets = new DifficultySettings[]
     {
-        new DifficultySettings(10f, 0.05f, 5f),   // Adagio
-        new DifficultySettings( 8f, 0.08f, 4f),   // Andante
-        new DifficultySettings( 6f, 0.12f, 2.5f), // Moderato
-        new DifficultySettings( 4f, 0.15f, 1.5f), // Allegro
+        new DifficultySettings(10f, 0.05f, 5f,  8.0f),  // Adagio   — ~1.25 notes on screen
+        new DifficultySettings( 8f, 0.08f, 4f,  5.0f),  // Andante  — ~1.6  notes on screen
+        new DifficultySettings( 6f, 0.12f, 2.5f,3.0f),  // Moderato — ~2    notes on screen
+        new DifficultySettings( 4f, 0.15f, 1.5f,1.5f),  // Allegro  — ~2.7  notes on screen
     };
 
     [Header("Game Settings")]
-    [SerializeField] private float delayBeforeNextNote = 2f;
     [SerializeField] private int maxLives = 3;
 
     [Header("Difficulty")]
@@ -48,16 +50,24 @@ public class GameManager : MonoBehaviour
     [SerializeField] private AudioClip incorrectSoundClip;
     [SerializeField][Range(0f, 1f)] private float audioVolume = 0.5f;
 
-    private MusicNote currentNote;
     private int score = 0;
     private int lives;
-    private bool waitingForAnswer = false;
     private bool debugMode = false;
     private bool isGameOver = false;
 
+    private float currentSpawnInterval = 3f;
+    private bool spawnImmediately = false;
+
     private AudioSource audioSource;
-    private AudioClip currentNoteToneClip;
     private AudioClip proceduralIncorrectClip;
+
+    private class ActiveNote
+    {
+        public MusicNote note;
+        public GameObject noteGroup;
+        public AudioClip toneClip;
+    }
+    private List<ActiveNote> activeNotes = new List<ActiveNote>();
 
     public static readonly int firstNoteIndex = 9; // C2
     public static readonly int lastNoteIndex = 37; // C6
@@ -81,10 +91,10 @@ public class GameManager : MonoBehaviour
         currentDifficulty = startingDifficulty;
         UpdateNoteSpeed();
 
-        StartCoroutine(GameLoop());
+        StartCoroutine(SpawnLoop());
     }
 
-    IEnumerator GameLoop()
+    IEnumerator SpawnLoop()
     {
         yield return new WaitForSeconds(1f);
 
@@ -96,98 +106,79 @@ public class GameManager : MonoBehaviour
                 continue;
             }
 
-            GenerateNewNote();
+            SpawnNote();
 
-            waitingForAnswer = true;
-            while (waitingForAnswer)
+            float elapsed = 0f;
+            while (elapsed < currentSpawnInterval && !spawnImmediately)
             {
-                if (debugMode || isGameOver)
-                {
-                    waitingForAnswer = false;
-                    break;
-                }
+                if (isGameOver || debugMode) break;
+                elapsed += Time.deltaTime;
                 yield return null;
             }
-
-            if (!isGameOver)
-                yield return new WaitForSeconds(delayBeforeNextNote);
+            spawnImmediately = false;
         }
     }
 
-    void GenerateNewNote()
+    void SpawnNote()
     {
-        currentNote = MusicNote.GenerateRandomNote(firstNoteIndex, lastNoteIndex);
-        currentNoteToneClip = GeneratePianoTone(GetNoteFrequency(currentNote));
+        MusicNote note = MusicNote.GenerateRandomNote(firstNoteIndex, lastNoteIndex);
+        AudioClip toneClip = GeneratePianoTone(GetNoteFrequency(note));
+        GameObject noteGroup = staffRenderer?.DisplayNote(note, note.BassClef);
+        if (noteGroup == null) return;
 
-        if (staffRenderer != null)
-        {
-            staffRenderer.ClearNotes();
-            staffRenderer.DisplayNote(currentNote, currentNote.BassClef);
-            staffRenderer.StartNoteAnimation(OnNoteExpired);
-        }
+        ActiveNote an = new ActiveNote { note = note, noteGroup = noteGroup, toneClip = toneClip };
+        activeNotes.Add(an);
+        staffRenderer.StartNoteAnimation(noteGroup, () => OnNoteExpired(an));
 
-        Debug.Log($"New note generated: {currentNote.GetFullName()} (pos: {currentNote.StaffPosition})");
+        Debug.Log($"Spawned note: {note.GetFullName()} (pos: {note.StaffPosition}), active notes: {activeNotes.Count}");
     }
 
     public void CheckAnswer(MusicNote.NoteName selectedNote)
     {
-        if (!waitingForAnswer) return;
+        if (activeNotes.Count == 0) return;
 
-        staffRenderer?.StopNoteAnimation();
+        ActiveNote oldest = activeNotes[0];
+        activeNotes.RemoveAt(0);  // remove before any callbacks
 
-        bool isCorrect = (selectedNote == currentNote.Name);
-        PlaySound(isCorrect);
-        staffRenderer?.PlayAnswerAnimation(isCorrect);
-
-        uiManager?.SetButtonsInteractable(false);
+        staffRenderer?.StopNoteAnimation(oldest.noteGroup);
+        bool isCorrect = (selectedNote == oldest.note.Name);
+        PlaySound(isCorrect, oldest.toneClip);
+        staffRenderer?.PlayAnswerAnimation(oldest.noteGroup, isCorrect);
 
         if (isCorrect)
         {
             score++;
             UpdateNoteSpeed();
-            if (uiManager != null)
-            {
-                uiManager.UpdateScore(score);
-                uiManager.ShowCorrectFeedback(currentNote.GetFullName());
-            }
-            Debug.Log($"Correct! That was {currentNote.GetFullName()}");
+            uiManager?.UpdateScore(score);
+            uiManager?.ShowCorrectFeedback(oldest.note.GetFullName());
+            Debug.Log($"Correct! That was {oldest.note.GetFullName()}");
         }
         else
         {
-            if (uiManager != null)
-                uiManager.ShowIncorrectFeedback(currentNote.Name.ToString(), currentNote.GetFullName());
-            Debug.Log($"Incorrect! The correct answer was {currentNote.Name} ({currentNote.GetFullName()})");
+            uiManager?.ShowIncorrectFeedback(oldest.note.Name.ToString(), oldest.note.GetFullName());
+            Debug.Log($"Incorrect! The correct answer was {oldest.note.Name} ({oldest.note.GetFullName()})");
             LoseLife();
         }
 
-        if (!isGameOver)
-            StartCoroutine(ReEnableButtons());
-
-        waitingForAnswer = false;
+        if (activeNotes.Count == 0)
+            spawnImmediately = true;
     }
 
     // Called when the note reaches the right edge without an answer
-    private void OnNoteExpired()
+    private void OnNoteExpired(ActiveNote an)
     {
-        if (!waitingForAnswer) return;
+        if (!activeNotes.Remove(an)) return;  // already answered
 
-        PlaySound(correct: false);
-        staffRenderer?.PlayAnswerAnimation(correct: false);
+        PlaySound(false, null);
+        staffRenderer?.PlayAnswerAnimation(an.noteGroup, false);
+        uiManager?.ShowIncorrectFeedback(an.note.Name.ToString(), an.note.GetFullName());
 
-        if (uiManager != null)
-        {
-            uiManager.SetButtonsInteractable(false);
-            uiManager.ShowIncorrectFeedback(currentNote.Name.ToString(), currentNote.GetFullName());
-        }
-
-        Debug.Log($"Note expired! The correct answer was {currentNote.Name} ({currentNote.GetFullName()})");
+        Debug.Log($"Note expired! The correct answer was {an.note.Name} ({an.note.GetFullName()})");
 
         LoseLife();
 
-        if (!isGameOver)
-            StartCoroutine(ReEnableButtons());
-
-        waitingForAnswer = false;
+        if (activeNotes.Count == 0)
+            spawnImmediately = true;
     }
 
     private void LoseLife()
@@ -203,8 +194,8 @@ public class GameManager : MonoBehaviour
     private void GameOver()
     {
         isGameOver = true;
-        waitingForAnswer = false;
-        staffRenderer?.StopNoteAnimation();
+        activeNotes.Clear();
+        staffRenderer?.ClearNotes();
 
         if (uiManager != null)
             uiManager.ShowGameOver(score);
@@ -212,18 +203,13 @@ public class GameManager : MonoBehaviour
         Debug.Log("Game Over!");
     }
 
-    IEnumerator ReEnableButtons()
-    {
-        yield return new WaitForSeconds(0.5f);
-        if (uiManager != null)
-            uiManager.SetButtonsInteractable(true);
-    }
-
     public void RestartGame()
     {
         isGameOver = false;
         score = 0;
         lives = maxLives;
+        activeNotes.Clear();
+        spawnImmediately = false;
         UpdateNoteSpeed();
 
         if (uiManager != null)
@@ -238,14 +224,14 @@ public class GameManager : MonoBehaviour
             staffRenderer.ClearNotes();
 
         StopAllCoroutines();
-        StartCoroutine(GameLoop());
+        StartCoroutine(SpawnLoop());
     }
 
-    private void PlaySound(bool correct)
+    private void PlaySound(bool correct, AudioClip toneClip)
     {
         if (audioSource == null) return;
         AudioClip clip = correct
-            ? (correctSoundClip   != null ? correctSoundClip   : currentNoteToneClip)
+            ? (correctSoundClip   != null ? correctSoundClip   : toneClip)
             : (incorrectSoundClip != null ? incorrectSoundClip : proceduralIncorrectClip);
         if (clip != null)
             audioSource.PlayOneShot(clip, audioVolume);
@@ -350,7 +336,8 @@ public class GameManager : MonoBehaviour
         DifficultySettings s = difficultyPresets[(int)currentDifficulty];
         float travelTime = Mathf.Max(s.minTravelTime, s.baseTravelTime - s.speedIncreasePerScore * score);
         staffRenderer?.SetNoteTravelTime(travelTime);
-        Debug.Log($"Note speed: {travelTime:F2}s travel time (difficulty: {currentDifficulty}, score: {score})");
+        currentSpawnInterval = s.spawnInterval;
+        Debug.Log($"Note speed: {travelTime:F2}s travel time, spawn interval: {currentSpawnInterval:F2}s (difficulty: {currentDifficulty}, score: {score})");
     }
 
     public void SetDebugMode(bool enabled)
@@ -359,10 +346,11 @@ public class GameManager : MonoBehaviour
 
         if (debugMode)
         {
-            staffRenderer?.StopNoteAnimation();
+            // Do not clear notes.  This was being called after the debug notes were displayed and clearing them.
+            //activeNotes.Clear();
+            //staffRenderer?.ClearNotes();
             if (uiManager != null)
                 uiManager.SetButtonsInteractable(false);
-            waitingForAnswer = false;
         }
         else
         {

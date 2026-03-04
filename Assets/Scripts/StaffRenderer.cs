@@ -24,7 +24,7 @@ public class StaffRenderer : MonoBehaviour
 
     [Header("Note Animation")]
     [SerializeField] private float noteTravelTime = 6f;
-    [SerializeField] private float noteStartXOffset = 4f; // Units from left edge where note appears
+    [SerializeField] private float noteStartXOffset = 2f; // Units from left edge where note appears
 
     [Header("Answer Animation")]
     [SerializeField] private float answerAnimDuration = 1.5f;
@@ -42,11 +42,8 @@ public class StaffRenderer : MonoBehaviour
     // Note objects are now noteGroup containers; children (sprite, ledger lines, label) move with them
     private List<GameObject> noteObjects = new List<GameObject>();
     private List<GameObject> noteLabelObjects = new List<GameObject>();
-    private MusicNote currentNote;
-    private float currentNoteYPos;
-    private GameObject currentNoteGroup;
-    private Coroutine animationCoroutine;
-    private Coroutine answerAnimCoroutine;
+    private Dictionary<GameObject, Coroutine> noteAnimCoroutines = new Dictionary<GameObject, Coroutine>();
+    private Dictionary<GameObject, Coroutine> answerAnimCoroutines = new Dictionary<GameObject, Coroutine>();
 
     private LineRenderer[] trebleStaffLines;
     private LineRenderer[] bassStaffLines;
@@ -151,23 +148,21 @@ public class StaffRenderer : MonoBehaviour
     }
 
     // Regular play: note starts at the left edge of the staff
-    public void DisplayNote(MusicNote note, bool bassClef)
+    public GameObject DisplayNote(MusicNote note, bool bassClef)
     {
-        DisplayNote(note, -staffWidth / 2 + noteStartXOffset, bassClef);
+        return DisplayNote(note, -staffWidth / 2 + noteStartXOffset, bassClef);
     }
 
     // Debug mode: note placed at a specific X position
-    public void DisplayNote(MusicNote note, float noteXPos, bool bassClef)
+    public GameObject DisplayNote(MusicNote note, float noteXPos, bool bassClef)
     {
-        currentNote = note;
-        currentNoteYPos = CalculateNoteYPosition(note.StaffPosition, bassClef);
+        float noteYPos = CalculateNoteYPosition(note.StaffPosition, bassClef);
 
         // Create a group container so sprite, ledger lines, and label all move together
         GameObject noteGroup = new GameObject($"NoteGroup_{note.GetFullName()}");
         noteGroup.transform.SetParent(transform);
-        noteGroup.transform.localPosition = new Vector3(noteXPos, currentNoteYPos, 0f);
+        noteGroup.transform.localPosition = new Vector3(noteXPos, noteYPos, 0f);
         noteObjects.Add(noteGroup);
-        currentNoteGroup = noteGroup;
 
         // Note sprite as child of group
         GameObject noteSprite = new GameObject("NoteSprite");
@@ -181,10 +176,12 @@ public class StaffRenderer : MonoBehaviour
         sr.sortingOrder = noteSortingOrder;
 
         // Ledger lines as children of group (they translate with the note)
-        AddLedgerLinesIfNeeded(note.StaffPosition, noteGroup, currentNoteYPos);
+        AddLedgerLinesIfNeeded(note.StaffPosition, noteGroup, noteYPos);
 
         if (showNoteNames)
             CreateNoteLabel(note, noteGroup.transform);
+
+        return noteGroup;
     }
 
     private float CalculateNoteYPosition(int staffPosition, bool bassClef)
@@ -290,9 +287,13 @@ public class StaffRenderer : MonoBehaviour
 
     public void ClearNotes()
     {
-        StopNoteAnimation();
+        foreach (var c in noteAnimCoroutines.Values)
+            if (c != null) StopCoroutine(c);
+        noteAnimCoroutines.Clear();
 
-        if (answerAnimCoroutine != null) { StopCoroutine(answerAnimCoroutine); answerAnimCoroutine = null; }
+        foreach (var c in answerAnimCoroutines.Values)
+            if (c != null) StopCoroutine(c);
+        answerAnimCoroutines.Clear();
 
         foreach (GameObject noteGroup in noteObjects)
         {
@@ -301,25 +302,33 @@ public class StaffRenderer : MonoBehaviour
         }
         noteObjects.Clear();
         noteLabelObjects.Clear();  // Destroyed with parent noteGroup
-        currentNoteGroup = null;
     }
 
     // --- Animation ---
 
-    public void StartNoteAnimation(System.Action onExpired)
+    public void StartNoteAnimation(GameObject noteGroup, System.Action onExpired)
     {
-        if (currentNoteGroup == null) return;
-        StopNoteAnimation();
+        if (noteGroup == null) return;
         float endX = staffWidth / 2;
-        animationCoroutine = StartCoroutine(AnimateNote(currentNoteGroup, endX, onExpired));
+        noteAnimCoroutines[noteGroup] = StartCoroutine(AnimateNote(noteGroup, endX, onExpired));
     }
 
+    // Stop all note animations (used by ClearNotes path)
     public void StopNoteAnimation()
     {
-        if (animationCoroutine != null)
+        foreach (var c in noteAnimCoroutines.Values)
+            if (c != null) StopCoroutine(c);
+        noteAnimCoroutines.Clear();
+    }
+
+    // Stop animation for a specific note (used when player answers)
+    public void StopNoteAnimation(GameObject noteGroup)
+    {
+        if (noteGroup == null) return;
+        if (noteAnimCoroutines.TryGetValue(noteGroup, out Coroutine c))
         {
-            StopCoroutine(animationCoroutine);
-            animationCoroutine = null;
+            if (c != null) StopCoroutine(c);
+            noteAnimCoroutines.Remove(noteGroup);
         }
     }
 
@@ -341,7 +350,7 @@ public class StaffRenderer : MonoBehaviour
 
             if (newX >= endX)
             {
-                animationCoroutine = null;
+                noteAnimCoroutines.Remove(noteGroup);
                 onComplete?.Invoke();
                 yield break;
             }
@@ -358,20 +367,15 @@ public class StaffRenderer : MonoBehaviour
 
     // --- Answer Animation ---
 
-    public void PlayAnswerAnimation(bool correct)
+    public void PlayAnswerAnimation(GameObject noteGroup, bool correct)
     {
-        if (currentNoteGroup == null) return;
-        if (answerAnimCoroutine != null) StopCoroutine(answerAnimCoroutine);
+        if (noteGroup == null) return;
+        if (answerAnimCoroutines.TryGetValue(noteGroup, out Coroutine existing) && existing != null)
+            StopCoroutine(existing);
 
-        GameObject noteGroup = currentNoteGroup;
         SpriteRenderer sr = noteGroup.transform.Find("NoteSprite")?.GetComponent<SpriteRenderer>();
         float direction = correct ? 1f : -1f;
-        answerAnimCoroutine = StartCoroutine(AnswerAnimCoroutine(noteGroup, sr, direction));
-    }
-
-    public void StopAnswerAnimation()
-    {
-        if (answerAnimCoroutine != null) { StopCoroutine(answerAnimCoroutine); answerAnimCoroutine = null; }
+        answerAnimCoroutines[noteGroup] = StartCoroutine(AnswerAnimCoroutine(noteGroup, sr, direction));
     }
 
     private IEnumerator AnswerAnimCoroutine(GameObject noteGroup, SpriteRenderer sr, float direction)
@@ -391,7 +395,9 @@ public class StaffRenderer : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
-        answerAnimCoroutine = null;
+        answerAnimCoroutines.Remove(noteGroup);
+        noteObjects.Remove(noteGroup);
+        if (noteGroup != null) Destroy(noteGroup);
     }
 
     // --- Show Note Names ---
@@ -399,20 +405,6 @@ public class StaffRenderer : MonoBehaviour
     public void SetShowNoteNames(bool show)
     {
         showNoteNames = show;
-
-        if (currentNote != null && noteObjects.Count > 0)
-        {
-            if (show && noteLabelObjects.Count == 0 && currentNoteGroup != null)
-            {
-                CreateNoteLabel(currentNote, currentNoteGroup.transform);
-            }
-            else if (!show && noteLabelObjects.Count > 0)
-            {
-                foreach (GameObject noteLabelObject in noteLabelObjects)
-                    Destroy(noteLabelObject);
-                noteLabelObjects.Clear();
-            }
-        }
 
         if (debugMode)
             DisplayAllDebugNotes();

@@ -9,7 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.8.0] - ?
 
-## [1.7.0] - ?
+## [1.7.0] - 2026-03-03
+
+### Added
+- **Multiple Simultaneous Notes** - Notes now spawn on a fixed timer independent of player answers, so several notes can slide across the staff at once
+- **Per-Difficulty Spawn Interval** - Each difficulty preset defines a spawn interval (Adagio 8 s, Andante 5 s, Moderato 3 s, Allegro 1.5 s), creating natural crowding at higher difficulties
+- **Immediate Spawn on Empty Staff** - When the last active note is answered or expires, the next note spawns immediately rather than waiting for the full interval
+- **`spawnInterval` field on `DifficultySettings`** - Spawn interval is now part of each difficulty preset and is applied by `UpdateNoteSpeed()`
+
+### Changed
+- **`GameManager`** - Replaced `GameLoop` coroutine (one-at-a-time, wait-then-spawn) with `SpawnLoop` (timer-based, continuous spawning); replaced `GenerateNewNote()` with `SpawnNote()` which appends to an `activeNotes` queue; `CheckAnswer` now targets the oldest (leftmost) active note; removed `waitingForAnswer`, `currentNote`, `delayBeforeNextNote`, and `ReEnableButtons` — buttons remain permanently enabled during play
+- **`StaffRenderer`** - `DisplayNote` now returns the spawned `GameObject`; per-note animation tracking uses `Dictionary<GameObject, Coroutine>` instead of single coroutine fields; `StartNoteAnimation`, `StopNoteAnimation`, and `PlayAnswerAnimation` now accept a `noteGroup` parameter; `AnswerAnimCoroutine` auto-destroys the note group after the fade completes; `SetShowNoteNames` simplified to set the flag only (existing notes keep their current label state)
 
 ## [1.6.0] - 2026-03-03
 
